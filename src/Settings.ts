@@ -1,5 +1,6 @@
 import { App, PluginSettingTab, Setting } from 'obsidian'
 import LazyPlugin from './main'
+const lazyPluginId = require('../manifest.json').id
 
 export interface LazySettings {
   shortDelaySeconds: number;
@@ -33,12 +34,12 @@ const LoadingMethods: { [key in LoadingMethod]: string } = {
 
 export class SettingsTab extends PluginSettingTab {
   app: App
-  plugin: LazyPlugin
+  lazyPlugin: LazyPlugin
 
   constructor (app: App, plugin: LazyPlugin) {
     super(app, plugin)
     this.app = app
-    this.plugin = plugin
+    this.lazyPlugin = plugin
   }
 
   display (): void {
@@ -49,32 +50,33 @@ export class SettingsTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName('Short delay (seconds)')
       .addText(text => text
-        .setValue(this.plugin.settings.shortDelaySeconds.toString())
+        .setValue(this.lazyPlugin.settings.shortDelaySeconds.toString())
         .onChange(async (value) => {
-          this.plugin.settings.shortDelaySeconds = parseInt(value, 10)
-          await this.plugin.saveSettings()
+          this.lazyPlugin.settings.shortDelaySeconds = parseInt(value, 10)
+          await this.lazyPlugin.saveSettings()
         }))
     new Setting(containerEl)
       .setName('Long delay (seconds)')
       .addText(text => text
-        .setValue(this.plugin.settings.longDelaySeconds.toString())
+        .setValue(this.lazyPlugin.settings.longDelaySeconds.toString())
         .onChange(async (value) => {
-          this.plugin.settings.longDelaySeconds = parseInt(value, 10)
-          await this.plugin.saveSettings()
+          this.lazyPlugin.settings.longDelaySeconds = parseInt(value, 10)
+          await this.lazyPlugin.saveSettings()
         }))
 
     // Delay settings for each individual plugin
     new Setting(containerEl)
       .setName('Plugin settings')
       .setHeading()
-    const pluginSettings = this.plugin.settings.plugins
+
+    const pluginSettings = this.lazyPlugin.settings.plugins
     Object.values(this.app.plugins.manifests)
       .sort((a, b) => {
         // Sort alphabetically by the plugin name
         return a.name.localeCompare(b.name)
       })
       .forEach(plugin => {
-        if (plugin.id === 'lazy-plugins') return // Can't set the config for this plugin
+        if (plugin.id === lazyPluginId) return // Don't set a config for this plugin
         new Setting(containerEl)
           .setName(plugin.name)
           .setDesc(plugin.description)
@@ -94,8 +96,8 @@ export class SettingsTab extends PluginSettingTab {
               .setValue(initialValue)
               .onChange(async value => {
                 pluginSettings[plugin.id] = { startupType: value as LoadingMethod }
-                await this.plugin.saveSettings()
-                this.plugin.setPluginStartup(plugin.id, value as LoadingMethod).then()
+                await this.lazyPlugin.saveSettings()
+                this.lazyPlugin.setPluginStartup(plugin.id, value as LoadingMethod).then()
               })
           })
       })
