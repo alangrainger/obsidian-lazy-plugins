@@ -1,0 +1,11 @@
+{
+	"id": "lazy-plugins",
+	"name": "Lazy Plugin Loader",
+	"version": "1.0.0",
+	"minAppVersion": "1.6.0",
+	"description": "Load plugins with a delay on Obsidian startup, so that you can get your app startup down into the sub-second loading time.",
+	"author": "Alan Grainger",
+	"authorUrl": "https://github.com/alangrainger",
+	"fundingUrl": "https://ko-fi.com/alan_",
+	"isDesktopOnly": false
+}
