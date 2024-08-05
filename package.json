@@ -1,7 +1,7 @@
 {
 	"name": "lazy-plugins",
-	"version": "1.0.1",
-	"description": "Load plugins with a delay on Obsidian startup, so that you can get your app startup down into the sub-second loading time.",
+	"version": "1.0.2",
+	"description": "Load plugins with a delay on startup, so that you can get your app startup down into the sub-second loading time.",
 	"main": "main.js",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
