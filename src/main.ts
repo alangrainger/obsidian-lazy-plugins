@@ -16,36 +16,36 @@ export default class LazyPlugin extends Plugin {
   }
 
   async setPluginStartup (pluginId: string, startupType: LoadingMethod) {
-    const plugins = this.app.plugins
-    const plugin = plugins.manifests[pluginId]
+    const obsidian = this.app.plugins
+    const plugin = obsidian.manifests[pluginId]
     if (!plugin) return
 
-    const isActiveOnStartup = plugins.enabledPlugins.has(pluginId)
-    const isRunning = !!this.app.plugins.plugins?.[pluginId]?._loaded
+    const isActiveOnStartup = obsidian.enabledPlugins.has(pluginId)
+    const isRunning = obsidian.plugins?.[pluginId]?._loaded
 
     switch (startupType) {
       // For disabled plugins
       case LoadingMethod.disabled:
-        await plugins.disablePluginAndSave(pluginId)
+        await obsidian.disablePluginAndSave(pluginId)
         break
       // For instant-start plugins
       case LoadingMethod.instant:
-        if (!isActiveOnStartup && !isRunning) await plugins.enablePluginAndSave(pluginId)
+        if (!isActiveOnStartup && !isRunning) await obsidian.enablePluginAndSave(pluginId)
         break
       // For plugins with a delay
       case LoadingMethod.short:
       case LoadingMethod.long:
         if (isActiveOnStartup) {
           // Disable and save so that it won't auto-start next time
-          await plugins.disablePluginAndSave(pluginId)
+          await obsidian.disablePluginAndSave(pluginId)
           // Immediately re-enable, since the plugin is already active and in-use
-          await plugins.enablePlugin(pluginId)
+          await obsidian.enablePlugin(pluginId)
         } else if (!isRunning) {
           // Start with a delay
           const seconds = startupType === LoadingMethod.short ? this.settings.shortDelaySeconds : this.settings.longDelaySeconds
           setTimeout(async () => {
             if (this.settings.showConsoleLog) console.log(`Starting ${pluginId} after a ${startupType} delay`)
-            await plugins.enablePlugin(pluginId)
+            await obsidian.enablePlugin(pluginId)
           }, seconds * 1000)
         }
         break
