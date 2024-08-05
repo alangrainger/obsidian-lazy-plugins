@@ -3,14 +3,16 @@ import LazyPlugin from './main'
 
 const lazyPluginId = require('../manifest.json').id
 
+interface PluginSettings {
+  startupType: LoadingMethod
+}
+
 export interface LazySettings {
+  [key: string]: any;
+
   shortDelaySeconds: number;
   longDelaySeconds: number;
-  plugins: {
-    [key: string]: {
-      startupType: LoadingMethod
-    }
-  };
+  plugins: { [pluginId: string]: PluginSettings };
   showConsoleLog: boolean;
 }
 
@@ -47,32 +49,31 @@ export class SettingsTab extends PluginSettingTab {
 
   display (): void {
     const { containerEl } = this
+    const pluginSettings = this.lazyPlugin.settings.plugins
 
     containerEl.empty()
 
-    new Setting(containerEl)
-      .setName('Short delay (seconds)')
-      .addText(text => text
-        .setValue(this.lazyPlugin.settings.shortDelaySeconds.toString())
-        .onChange(async (value) => {
-          this.lazyPlugin.settings.shortDelaySeconds = parseFloat(parseFloat(value).toFixed(3))
-          await this.lazyPlugin.saveSettings()
-        }))
-    new Setting(containerEl)
-      .setName('Long delay (seconds)')
-      .addText(text => text
-        .setValue(this.lazyPlugin.settings.longDelaySeconds.toString())
-        .onChange(async (value) => {
-          this.lazyPlugin.settings.longDelaySeconds = parseFloat(parseFloat(value).toFixed(3))
-          await this.lazyPlugin.saveSettings()
-        }))
+    // Create the two timer settings fields
+    Object.entries({
+      shortDelaySeconds: 'Short delay (seconds)',
+      longDelaySeconds: 'Long delay (seconds)'
+    })
+      .forEach(([key, name]) => {
+        new Setting(containerEl)
+          .setName(name)
+          .addText(text => text
+            .setValue(this.lazyPlugin.settings[key].toString())
+            .onChange(async (value) => {
+              this.lazyPlugin.settings[key] = parseFloat(parseFloat(value).toFixed(3))
+              await this.lazyPlugin.saveSettings()
+            }))
+      })
 
-    // Delay settings for each individual plugin
     new Setting(containerEl)
-      .setName('Plugin settings')
+      .setName('Plugin delay settings')
       .setHeading()
 
-    const pluginSettings = this.lazyPlugin.settings.plugins
+    // Add the delay settings for each installed plugin
     Object.values(this.app.plugins.manifests)
       .sort((a, b) => {
         // Sort alphabetically by the plugin name
@@ -100,9 +101,8 @@ export class SettingsTab extends PluginSettingTab {
             dropdown
               .setValue(initialValue)
               .onChange(async (value: LoadingMethod) => {
-                pluginSettings[plugin.id] = {
-                  startupType: value
-                }
+                // Update the config file, and disable/enable the plugin if needed
+                pluginSettings[plugin.id] = { startupType: value }
                 await this.lazyPlugin.saveSettings()
                 this.lazyPlugin.setPluginStartup(plugin.id, value).then()
               })

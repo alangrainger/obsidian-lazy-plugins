@@ -15,6 +15,11 @@ export default class LazyPlugin extends Plugin {
       })
   }
 
+  /**
+   * Configure and load a plugin based on its startup settings
+   * @param pluginId
+   * @param startupType
+   */
   async setPluginStartup (pluginId: string, startupType: LoadingMethod) {
     const obsidian = this.app.plugins
     const plugin = obsidian.manifests[pluginId]
