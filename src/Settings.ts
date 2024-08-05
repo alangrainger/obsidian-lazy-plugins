@@ -1,5 +1,6 @@
 import { App, PluginSettingTab, Setting } from 'obsidian'
 import LazyPlugin from './main'
+
 const lazyPluginId = require('../manifest.json').id
 
 export interface LazySettings {
@@ -9,13 +10,15 @@ export interface LazySettings {
     [key: string]: {
       startupType: LoadingMethod
     }
-  }
+  };
+  showConsoleLog: boolean;
 }
 
 export const DEFAULT_SETTINGS: LazySettings = {
   shortDelaySeconds: 5,
   longDelaySeconds: 15,
-  plugins: {}
+  plugins: {},
+  showConsoleLog: false
 }
 
 export enum LoadingMethod {
@@ -52,7 +55,7 @@ export class SettingsTab extends PluginSettingTab {
       .addText(text => text
         .setValue(this.lazyPlugin.settings.shortDelaySeconds.toString())
         .onChange(async (value) => {
-          this.lazyPlugin.settings.shortDelaySeconds = parseInt(value, 10)
+          this.lazyPlugin.settings.shortDelaySeconds = parseFloat(parseFloat(value).toFixed(3))
           await this.lazyPlugin.saveSettings()
         }))
     new Setting(containerEl)
@@ -60,7 +63,7 @@ export class SettingsTab extends PluginSettingTab {
       .addText(text => text
         .setValue(this.lazyPlugin.settings.longDelaySeconds.toString())
         .onChange(async (value) => {
-          this.lazyPlugin.settings.longDelaySeconds = parseInt(value, 10)
+          this.lazyPlugin.settings.longDelaySeconds = parseFloat(parseFloat(value).toFixed(3))
           await this.lazyPlugin.saveSettings()
         }))
 
@@ -88,16 +91,20 @@ export class SettingsTab extends PluginSettingTab {
 
             // Get the initial value for the dropdown
             let initialValue = pluginSettings?.[plugin.id]?.startupType
-            if (!initialValue || !LoadingMethods[initialValue as LoadingMethod]) {
+            if (!initialValue || !LoadingMethods[initialValue]) {
+              // If there is no setting for this plugin, set the initial value to instant or disabled,
+              // depending on its current state
               initialValue = this.app.plugins.enabledPlugins.has(plugin.id) ? LoadingMethod.instant : LoadingMethod.disabled
             }
 
             dropdown
               .setValue(initialValue)
-              .onChange(async value => {
-                pluginSettings[plugin.id] = { startupType: value as LoadingMethod }
+              .onChange(async (value: LoadingMethod) => {
+                pluginSettings[plugin.id] = {
+                  startupType: value
+                }
                 await this.lazyPlugin.saveSettings()
-                this.lazyPlugin.setPluginStartup(plugin.id, value as LoadingMethod).then()
+                this.lazyPlugin.setPluginStartup(plugin.id, value).then()
               })
           })
       })

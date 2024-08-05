@@ -20,28 +20,31 @@ export default class LazyPlugin extends Plugin {
     const plugin = plugins.manifests[pluginId]
     if (!plugin) return
 
-    const isActive = plugins.enabledPlugins.has(pluginId)
+    const isActiveOnStartup = plugins.enabledPlugins.has(pluginId)
+    const isRunning = !!this.app.plugins.plugins?.[pluginId]?._loaded
+
     switch (startupType) {
+      // For disabled plugins
       case LoadingMethod.disabled:
         await plugins.disablePluginAndSave(pluginId)
         break
+      // For instant-start plugins
       case LoadingMethod.instant:
-        if (!isActive) await plugins.enablePluginAndSave(pluginId)
+        if (!isActiveOnStartup && !isRunning) await plugins.enablePluginAndSave(pluginId)
         break
+      // For plugins with a delay
       case LoadingMethod.short:
       case LoadingMethod.long:
-        if (isActive) {
+        if (isActiveOnStartup) {
           // Disable and save so that it won't auto-start next time
           await plugins.disablePluginAndSave(pluginId)
           // Immediately re-enable, since the plugin is already active and in-use
           await plugins.enablePlugin(pluginId)
-        } else {
-          // This is the normal state for a delayed plugin to be in
-          await plugins.disablePluginAndSave(pluginId)
+        } else if (!isRunning) {
           // Start with a delay
           const seconds = startupType === LoadingMethod.short ? this.settings.shortDelaySeconds : this.settings.longDelaySeconds
           setTimeout(async () => {
-            console.log(`Starting ${pluginId} after a ${startupType} delay`)
+            if (this.settings.showConsoleLog) console.log(`Starting ${pluginId} after a ${startupType} delay`)
             await plugins.enablePlugin(pluginId)
           }, seconds * 1000)
         }
