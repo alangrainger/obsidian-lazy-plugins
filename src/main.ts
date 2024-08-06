@@ -3,6 +3,7 @@ import { DEFAULT_SETTINGS, LazySettings, LoadingMethod, SettingsTab } from './Se
 
 export default class LazyPlugin extends Plugin {
   settings: LazySettings
+  pendingTimeouts: NodeJS.Timeout[] = []
 
   async onload () {
     await this.loadSettings()
@@ -48,10 +49,14 @@ export default class LazyPlugin extends Plugin {
         } else if (!isRunning) {
           // Start with a delay
           const seconds = startupType === LoadingMethod.short ? this.settings.shortDelaySeconds : this.settings.longDelaySeconds
-          setTimeout(async () => {
-            if (this.settings.showConsoleLog) console.log(`Starting ${pluginId} after a ${startupType} delay`)
+          const timeout = setTimeout(async () => {
+            if (this.settings.showConsoleLog) {
+              console.log(`Starting ${pluginId} after a ${startupType} delay`)
+            }
             await obsidian.enablePlugin(pluginId)
-          }, seconds * 1000)
+          }, seconds * 1000 + Math.random() * 200)
+          // Store the timeout so we can cancel it later if needed during plugin unload
+          this.pendingTimeouts.push(timeout)
         }
         break
     }
@@ -63,5 +68,25 @@ export default class LazyPlugin extends Plugin {
 
   async saveSettings () {
     await this.saveData(this.settings)
+  }
+
+  /**
+   * When the Lazy Loader plugin is disabled / deleted from Obsidian, iterate over
+   * the configured plugins and re-enable any that are set to be delayed.
+   *
+   * This will cause a short slowdown as each plugin has to be disabled and then
+   * re-enabled to save its new startup state.
+   */
+  async onunload () {
+    // Clear any pending timeouts
+    this.pendingTimeouts.forEach(timeout => clearTimeout(timeout))
+    // Iterate over the configured plugins
+    for (const [pluginId, data] of Object.entries(this.settings.plugins)) {
+      if (data.startupType === LoadingMethod.short || data.startupType === LoadingMethod.long) {
+        await this.app.plugins.disablePlugin(pluginId)
+        await this.app.plugins.enablePluginAndSave(pluginId)
+        console.log(`Set ${pluginId} back to instant start`)
+      }
+    }
   }
 }

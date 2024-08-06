@@ -1,4 +1,4 @@
-import { App, PluginSettingTab, Setting } from 'obsidian'
+import { App, DropdownComponent, PluginSettingTab, Setting } from 'obsidian'
 import LazyPlugin from './main'
 
 const lazyPluginId = require('../manifest.json').id
@@ -40,6 +40,7 @@ const LoadingMethods: { [key in LoadingMethod]: string } = {
 export class SettingsTab extends PluginSettingTab {
   app: App
   lazyPlugin: LazyPlugin
+  dropdowns: DropdownComponent[] = []
 
   constructor (app: App, plugin: LazyPlugin) {
     super(app, plugin)
@@ -73,6 +74,29 @@ export class SettingsTab extends PluginSettingTab {
       .setName('Plugin delay settings')
       .setHeading()
 
+    // Set all plugins at once
+    new Setting(containerEl)
+      .setName('Set all plugins at once')
+      .addDropdown(dropdown => {
+        dropdown.addOption('', 'Set all plugins to be:')
+        Object.keys(LoadingMethods).forEach(key => {
+          dropdown.addOption(key, LoadingMethods[key as LoadingMethod])
+        })
+        dropdown
+          .onChange(async (value: LoadingMethod) => {
+            // Update all plugins and save the config, but don't reload the plugins (would slow the UI down)
+            Object.values(this.app.plugins.manifests)
+              .filter(plugin => plugin.id !== lazyPluginId)
+              .forEach(plugin => {
+                pluginSettings[plugin.id] = { startupType: value }
+              })
+            // Update all the dropdowns
+            this.dropdowns.forEach(dropdown => dropdown.setValue(value))
+            dropdown.setValue('')
+            await this.lazyPlugin.saveSettings()
+          })
+      })
+
     // Add the delay settings for each installed plugin
     Object.values(this.app.plugins.manifests)
       .sort((a, b) => {
@@ -85,6 +109,8 @@ export class SettingsTab extends PluginSettingTab {
           .setName(plugin.name)
           .setDesc(plugin.description)
           .addDropdown(dropdown => {
+            this.dropdowns.push(dropdown)
+
             // Add the dropdown selection options
             Object.keys(LoadingMethods).forEach(key => {
               dropdown.addOption(key, LoadingMethods[key as LoadingMethod])
