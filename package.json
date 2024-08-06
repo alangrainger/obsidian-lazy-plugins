@@ -1,6 +1,6 @@
 {
 	"name": "lazy-plugins",
-	"version": "1.0.2",
+	"version": "1.0.3",
 	"description": "Load plugins with a delay on startup, so that you can get your app startup down into the sub-second loading time.",
 	"main": "main.js",
 	"scripts": {
