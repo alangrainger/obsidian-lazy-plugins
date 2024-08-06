@@ -76,33 +76,27 @@ export class SettingsTab extends PluginSettingTab {
 
     // Set all plugins at once
     new Setting(containerEl)
-      .setName('Set all plugins at once')
+      .setName('Set the delay for all plugins at once')
       .addDropdown(dropdown => {
         dropdown.addOption('', 'Set all plugins to be:')
-        Object.keys(LoadingMethods).forEach(key => {
-          dropdown.addOption(key, LoadingMethods[key as LoadingMethod])
+        this.addDelayOptions(dropdown)
+        dropdown.onChange(async (value: LoadingMethod) => {
+          // Update all plugins and save the config, but don't reload the plugins (would slow the UI down)
+          Object.values(this.app.plugins.manifests)
+            .filter(plugin => plugin.id !== lazyPluginId)
+            .forEach(plugin => {
+              pluginSettings[plugin.id] = { startupType: value }
+            })
+          // Update all the dropdowns
+          this.dropdowns.forEach(dropdown => dropdown.setValue(value))
+          dropdown.setValue('')
+          await this.lazyPlugin.saveSettings()
         })
-        dropdown
-          .onChange(async (value: LoadingMethod) => {
-            // Update all plugins and save the config, but don't reload the plugins (would slow the UI down)
-            Object.values(this.app.plugins.manifests)
-              .filter(plugin => plugin.id !== lazyPluginId)
-              .forEach(plugin => {
-                pluginSettings[plugin.id] = { startupType: value }
-              })
-            // Update all the dropdowns
-            this.dropdowns.forEach(dropdown => dropdown.setValue(value))
-            dropdown.setValue('')
-            await this.lazyPlugin.saveSettings()
-          })
       })
 
     // Add the delay settings for each installed plugin
     Object.values(this.app.plugins.manifests)
-      .sort((a, b) => {
-        // Sort alphabetically by the plugin name
-        return a.name.localeCompare(b.name)
-      })
+      .sort((a, b) => a.name.localeCompare(b.name))
       .forEach(plugin => {
         if (plugin.id === lazyPluginId) return // Don't set a config for this plugin
         new Setting(containerEl)
@@ -110,11 +104,7 @@ export class SettingsTab extends PluginSettingTab {
           .setDesc(plugin.description)
           .addDropdown(dropdown => {
             this.dropdowns.push(dropdown)
-
-            // Add the dropdown selection options
-            Object.keys(LoadingMethods).forEach(key => {
-              dropdown.addOption(key, LoadingMethods[key as LoadingMethod])
-            })
+            this.addDelayOptions(dropdown)
 
             // Get the initial value for the dropdown
             let initialValue = pluginSettings?.[plugin.id]?.startupType
@@ -133,6 +123,16 @@ export class SettingsTab extends PluginSettingTab {
                 this.lazyPlugin.setPluginStartup(plugin.id, value).then()
               })
           })
+      })
+  }
+
+  /**
+   * Add the dropdown select options for each delay type
+   */
+  addDelayOptions (el: DropdownComponent) {
+    Object.keys(LoadingMethods)
+      .forEach(key => {
+        el.addOption(key, LoadingMethods[key as LoadingMethod])
       })
   }
 }

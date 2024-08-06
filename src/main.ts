@@ -54,7 +54,7 @@ export default class LazyPlugin extends Plugin {
               console.log(`Starting ${pluginId} after a ${startupType} delay`)
             }
             await obsidian.enablePlugin(pluginId)
-          }, seconds * 1000 + Math.random() * 200)
+          }, seconds * 1000 + Math.random() * 100)
           // Store the timeout so we can cancel it later if needed during plugin unload
           this.pendingTimeouts.push(timeout)
         }
