@@ -1,31 +1,35 @@
-import { Plugin } from 'obsidian'
+import { Plugin, PluginManifest } from 'obsidian'
 import { DEFAULT_SETTINGS, LazySettings, LoadingMethod, SettingsTab } from './Settings'
+
+const lazyPluginId = require('../manifest.json').id
 
 export default class LazyPlugin extends Plugin {
   settings: LazySettings
+  manifests: PluginManifest[]
   pendingTimeouts: NodeJS.Timeout[] = []
 
   async onload () {
     await this.loadSettings()
+    this.manifests = Object.values(this.app.plugins.manifests)
+      .filter(plugin => plugin.id !== lazyPluginId) // Filter out the Lazy Loader plugin
+      .sort((a, b) => a.name.localeCompare(b.name))
+
+    await this.setInitialConfiguration()
     this.addSettingTab(new SettingsTab(this.app, this))
 
     // Iterate over the installed plugins and load them with the specified delay
-    Object.entries(this.settings.plugins)
-      .forEach(([pluginId, data]) => {
-        this.setPluginStartup(pluginId, data.startupType)
-      })
+    this.manifests.forEach(plugin => {
+      this.setPluginStartup(plugin.id)
+    })
   }
 
   /**
    * Configure and load a plugin based on its startup settings
-   * @param pluginId
-   * @param startupType
    */
-  async setPluginStartup (pluginId: string, startupType: LoadingMethod) {
+  async setPluginStartup (pluginId: string) {
     const obsidian = this.app.plugins
-    const plugin = obsidian.manifests[pluginId]
-    if (!plugin) return
 
+    const startupType = this.settings.plugins?.[pluginId]?.startupType
     const isActiveOnStartup = obsidian.enabledPlugins.has(pluginId)
     const isRunning = obsidian.plugins?.[pluginId]?._loaded
 
@@ -46,14 +50,16 @@ export default class LazyPlugin extends Plugin {
           await obsidian.disablePluginAndSave(pluginId)
           // Immediately re-enable, since the plugin is already active and in-use
           await obsidian.enablePlugin(pluginId)
-        } else if (!isRunning) {
+        } else {
           // Start with a delay
           const seconds = startupType === LoadingMethod.short ? this.settings.shortDelaySeconds : this.settings.longDelaySeconds
           const timeout = setTimeout(async () => {
-            if (this.settings.showConsoleLog) {
-              console.log(`Starting ${pluginId} after a ${startupType} delay`)
+            if (!obsidian.plugins?.[pluginId]?._loaded) {
+              if (this.settings.showConsoleLog) {
+                console.log(`Starting ${pluginId} after a ${startupType} delay`)
+              }
+              await obsidian.enablePlugin(pluginId)
             }
-            await obsidian.enablePlugin(pluginId)
           }, seconds * 1000 + Math.random() * 100)
           // Store the timeout so we can cancel it later if needed during plugin unload
           this.pendingTimeouts.push(timeout)
@@ -68,6 +74,31 @@ export default class LazyPlugin extends Plugin {
 
   async saveSettings () {
     await this.saveData(this.settings)
+  }
+
+  /**
+   * Set the initial config value for all installed plugins.
+   * This will also set the value for any new plugin in the future, depending on what default value
+   * is chosen in the Settings page.
+   */
+  async setInitialConfiguration () {
+    for (const plugin of this.manifests) {
+      if (!this.settings.plugins?.[plugin.id]?.startupType) {
+        // There is no existing setting for this plugin, so create one
+        await this.updatePluginSettings(plugin.id,
+          this.settings.defaultStartupType ||
+          (this.app.plugins.enabledPlugins.has(plugin.id) ? LoadingMethod.instant : LoadingMethod.disabled)
+        )
+      }
+    }
+  }
+
+  /**
+   * Update an individual plugin's configuration and the settings file
+   */
+  async updatePluginSettings (pluginId: string, startupType: LoadingMethod) {
+    this.settings.plugins[pluginId] = { startupType }
+    await this.saveSettings()
   }
 
   /**
