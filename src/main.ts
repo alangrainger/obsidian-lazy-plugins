@@ -10,21 +10,23 @@ export default class LazyPlugin extends Plugin {
 
   async onload () {
     await this.loadSettings()
+
+    // Get the list of installed plugins
     this.manifests = Object.values(this.app.plugins.manifests)
       .filter(plugin => plugin.id !== lazyPluginId) // Filter out the Lazy Loader plugin
       .sort((a, b) => a.name.localeCompare(b.name))
 
-    await this.setInitialConfiguration()
+    await this.setInitialPluginsConfiguration()
     this.addSettingTab(new SettingsTab(this.app, this))
 
     // Iterate over the installed plugins and load them with the specified delay
-    this.manifests.forEach(plugin => {
-      this.setPluginStartup(plugin.id)
-    })
+    this.manifests.forEach(plugin => this.setPluginStartup(plugin.id))
   }
 
   /**
-   * Configure and load a plugin based on its startup settings
+   * Configure and load a plugin based on its startup settings.
+   * This uses Obsidian's enablePluginAndSave() and disablePluginAndSave() functions
+   * to save the configuration state for Obsidian's next start.
    */
   async setPluginStartup (pluginId: string) {
     const obsidian = this.app.plugins
@@ -81,7 +83,7 @@ export default class LazyPlugin extends Plugin {
    * This will also set the value for any new plugin in the future, depending on what default value
    * is chosen in the Settings page.
    */
-  async setInitialConfiguration () {
+  async setInitialPluginsConfiguration () {
     for (const plugin of this.manifests) {
       if (!this.settings.plugins?.[plugin.id]?.startupType) {
         // There is no existing setting for this plugin, so create one
