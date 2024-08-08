@@ -55,6 +55,10 @@ export default class LazyPlugin extends Plugin {
         } else {
           // Start with a delay
           const seconds = startupType === LoadingMethod.short ? this.settings.shortDelaySeconds : this.settings.longDelaySeconds
+          // Add a short additional delay to each plugin, for two purposes:
+          // 1. Have them load in a consistent order, which helps them appear in the sidebar in the same order
+          // 2. Stagger them slightly so there's not a big slowdown when they all fire at once
+          const delay = this.manifests.findIndex(x => x.id === pluginId) * 40
           const timeout = setTimeout(async () => {
             if (!obsidian.plugins?.[pluginId]?._loaded) {
               if (this.settings.showConsoleLog) {
@@ -62,7 +66,7 @@ export default class LazyPlugin extends Plugin {
               }
               await obsidian.enablePlugin(pluginId)
             }
-          }, seconds * 1000 + Math.random() * 100)
+          }, seconds * 1000 + delay)
           // Store the timeout so we can cancel it later if needed during plugin unload
           this.pendingTimeouts.push(timeout)
         }
