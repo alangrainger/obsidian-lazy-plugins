@@ -13,8 +13,10 @@ export default class LazyPlugin extends Plugin {
 
     // Get the list of installed plugins
     this.manifests = Object.values(this.app.plugins.manifests)
-      .filter(plugin => plugin.id !== lazyPluginId) // Filter out the Lazy Loader plugin
-      .filter(plugin => !(Platform.isMobile && plugin.isDesktopOnly)) // Filter out desktop-only plugins from mobile
+      .filter(plugin =>
+        plugin.id !== lazyPluginId && // Filter out the Lazy Loader plugin
+        !(Platform.isMobile && plugin.isDesktopOnly) // Filter out desktop-only plugins from mobile
+      )
       .sort((a, b) => a.name.localeCompare(b.name))
 
     await this.setInitialPluginsConfiguration()
