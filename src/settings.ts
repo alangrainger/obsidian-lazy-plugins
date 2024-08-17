@@ -2,7 +2,8 @@ import { App, DropdownComponent, PluginSettingTab, Setting } from 'obsidian'
 import LazyPlugin from './main'
 
 interface PluginSettings {
-  startupType: LoadingMethod
+  startupType: LoadingMethod;
+  startupMobile?: LoadingMethod;
 }
 
 export interface LazySettings {
@@ -82,13 +83,14 @@ export class SettingsTab extends PluginSettingTab {
         dropdown
           .setValue(this.lazyPlugin.settings.defaultStartupType || '')
           .onChange(async (value: LoadingMethod) => {
-          this.lazyPlugin.settings.defaultStartupType = value || null
-          await this.lazyPlugin.saveSettings()
-        })
+            this.lazyPlugin.settings.defaultStartupType = value || null
+            await this.lazyPlugin.saveSettings()
+          })
       })
 
     new Setting(containerEl)
       .setName('Individual plugin delay settings')
+      .setDesc('These settings can be set differently on a desktop or mobile device.')
       .setHeading()
 
     new Setting(containerEl)
@@ -118,7 +120,7 @@ export class SettingsTab extends PluginSettingTab {
             this.addDelayOptions(dropdown)
 
             dropdown
-              .setValue(pluginSettings?.[plugin.id]?.startupType)
+              .setValue(this.lazyPlugin.getPluginStartup(plugin.id))
               .onChange(async (value: LoadingMethod) => {
                 // Update the config file, and disable/enable the plugin if needed
                 await this.lazyPlugin.updatePluginSettings(plugin.id, value)

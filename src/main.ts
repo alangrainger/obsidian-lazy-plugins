@@ -1,5 +1,5 @@
-import { Plugin, PluginManifest } from 'obsidian'
-import { DEFAULT_SETTINGS, LazySettings, LoadingMethod, SettingsTab } from './Settings'
+import { Platform, Plugin, PluginManifest } from 'obsidian'
+import { DEFAULT_SETTINGS, LazySettings, LoadingMethod, SettingsTab } from './settings'
 
 const lazyPluginId = require('../manifest.json').id
 
@@ -14,6 +14,7 @@ export default class LazyPlugin extends Plugin {
     // Get the list of installed plugins
     this.manifests = Object.values(this.app.plugins.manifests)
       .filter(plugin => plugin.id !== lazyPluginId) // Filter out the Lazy Loader plugin
+      .filter(plugin => !(Platform.isMobile && plugin.isDesktopOnly)) // Filter out desktop-only plugins from mobile
       .sort((a, b) => a.name.localeCompare(b.name))
 
     await this.setInitialPluginsConfiguration()
@@ -31,7 +32,7 @@ export default class LazyPlugin extends Plugin {
   async setPluginStartup (pluginId: string) {
     const obsidian = this.app.plugins
 
-    const startupType = this.settings.plugins?.[pluginId]?.startupType
+    const startupType = this.getPluginStartup(pluginId)
     const isActiveOnStartup = obsidian.enabledPlugins.has(pluginId)
     const isRunning = obsidian.plugins?.[pluginId]?._loaded
 
@@ -74,6 +75,14 @@ export default class LazyPlugin extends Plugin {
     }
   }
 
+  getPluginStartup (pluginId: string): LoadingMethod {
+    let value
+    if (Platform.isMobile) value = this.settings.plugins?.[pluginId]?.startupMobile
+    return value ||
+      this.settings.plugins?.[pluginId]?.startupType ||
+      (this.app.plugins.enabledPlugins.has(pluginId) ? LoadingMethod.instant : LoadingMethod.disabled)
+  }
+
   async loadSettings () {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData())
   }
@@ -103,7 +112,13 @@ export default class LazyPlugin extends Plugin {
    * Update an individual plugin's configuration and the settings file
    */
   async updatePluginSettings (pluginId: string, startupType: LoadingMethod) {
-    this.settings.plugins[pluginId] = { startupType }
+    const settings = this.settings.plugins[pluginId] || { startupType }
+    if (Platform.isMobile) {
+      settings.startupMobile = startupType
+    } else {
+      settings.startupType = startupType
+    }
+    this.settings.plugins[pluginId] = settings
     await this.saveSettings()
   }
 
