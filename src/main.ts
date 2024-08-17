@@ -14,9 +14,8 @@ export default class LazyPlugin extends Plugin {
     // Get the list of installed plugins
     this.manifests = Object.values(this.app.plugins.manifests)
       .filter(plugin =>
-        plugin.id !== lazyPluginId && // Filter out the Lazy Loader plugin
-        !(Platform.isMobile && plugin.isDesktopOnly) // Filter out desktop-only plugins from mobile
-      )
+        plugin.id !== lazyPluginId &&                  // Filter out the Lazy Loader plugin
+        !(Platform.isMobile && plugin.isDesktopOnly))  // Filter out desktop-only plugins from mobile
       .sort((a, b) => a.name.localeCompare(b.name))
 
     await this.setInitialPluginsConfiguration()
@@ -77,6 +76,11 @@ export default class LazyPlugin extends Plugin {
     }
   }
 
+  /**
+   * Get the startup type for a given pluginId, depending on whether the user
+   * is on desktop or mobile. Fallback to Obsidian's current loading method
+   * (enabled/disabled) if no configuration is found for this plugin.
+   */
   getPluginStartup (pluginId: string): LoadingMethod {
     let value
     if (Platform.isMobile) value = this.settings.plugins?.[pluginId]?.startupMobile
@@ -94,9 +98,9 @@ export default class LazyPlugin extends Plugin {
   }
 
   /**
-   * Set the initial config value for all installed plugins.
-   * This will also set the value for any new plugin in the future, depending on what default value
-   * is chosen in the Settings page.
+   * Set the initial config value for all installed plugins. This will also set the value
+   * for any new plugin in the future, depending on what default value is chosen in the
+   * Settings page.
    */
   async setInitialPluginsConfiguration () {
     for (const plugin of this.manifests) {
@@ -111,7 +115,7 @@ export default class LazyPlugin extends Plugin {
   }
 
   /**
-   * Update an individual plugin's configuration and the settings file
+   * Update an individual plugin's configuration in the settings file
    */
   async updatePluginSettings (pluginId: string, startupType: LoadingMethod) {
     const settings = this.settings.plugins[pluginId] || { startupType }
