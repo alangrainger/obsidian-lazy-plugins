@@ -3,25 +3,35 @@ import LazyPlugin from './main'
 
 interface PluginSettings {
   startupType: LoadingMethod;
-  startupMobile?: LoadingMethod;
 }
 
-export interface LazySettings {
+export interface DeviceSettings {
   [key: string]: any;
 
   shortDelaySeconds: number;
   longDelaySeconds: number;
   defaultStartupType: LoadingMethod | null;
   plugins: { [pluginId: string]: PluginSettings };
-  showConsoleLog: boolean;
 }
 
-export const DEFAULT_SETTINGS: LazySettings = {
+export const DEFAULT_DEVICE_SETTINGS: DeviceSettings = {
   shortDelaySeconds: 5,
   longDelaySeconds: 15,
   defaultStartupType: null,
-  plugins: {},
-  showConsoleLog: false
+  plugins: {}
+}
+
+export interface LazySettings {
+  dualConfigs: boolean;
+  showConsoleLog: boolean;
+  desktop: DeviceSettings;
+  mobile?: DeviceSettings;
+}
+
+export const DEFAULT_SETTINGS: LazySettings = {
+  dualConfigs: false,
+  showConsoleLog: false,
+  desktop: DEFAULT_DEVICE_SETTINGS
 }
 
 export enum LoadingMethod {
@@ -55,6 +65,25 @@ export class SettingsTab extends PluginSettingTab {
 
     containerEl.empty()
 
+    new Setting(containerEl)
+      .setName('Separate desktop/mobile configuration')
+      .setDesc('Enable this if you want to have different settings depending whether you\'re using a desktop or mobile device. ' +
+        'All of the settings below can be configured differently on desktop and mobile.')
+      .addToggle(toggle => {
+        toggle
+          .setValue(this.lazyPlugin.data.dualConfigs)
+          .onChange(async (value) => {
+            this.lazyPlugin.data.dualConfigs = value
+            await this.lazyPlugin.saveSettings()
+            // Refresh the settings to make sure the mobile section is configured
+            await this.lazyPlugin.loadSettings()
+          })
+      })
+
+    new Setting(containerEl)
+      .setName('Global plugin delay settings')
+      .setHeading()
+
     // Create the two timer settings fields
     Object.entries({
       shortDelaySeconds: 'Short delay (seconds)',
@@ -72,10 +101,6 @@ export class SettingsTab extends PluginSettingTab {
       })
 
     new Setting(containerEl)
-      .setName('Global plugin delay settings')
-      .setHeading()
-
-    new Setting(containerEl)
       .setName('Default startup type for new plugins')
       .addDropdown(dropdown => {
         dropdown.addOption('', 'Nothing configured')
@@ -90,7 +115,6 @@ export class SettingsTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Individual plugin delay settings')
-      .setDesc('These settings can be set differently on a desktop or mobile device.')
       .setHeading()
 
     new Setting(containerEl)

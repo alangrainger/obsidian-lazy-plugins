@@ -1,10 +1,17 @@
 import { Platform, Plugin, PluginManifest } from 'obsidian'
-import { DEFAULT_SETTINGS, LazySettings, LoadingMethod, SettingsTab } from './settings'
+import {
+  DEFAULT_SETTINGS,
+  DeviceSettings,
+  LazySettings,
+  LoadingMethod,
+  SettingsTab
+} from './settings'
 
 const lazyPluginId = require('../manifest.json').id
 
 export default class LazyPlugin extends Plugin {
-  settings: LazySettings
+  data: LazySettings
+  settings: DeviceSettings
   manifests: PluginManifest[]
   pendingTimeouts: NodeJS.Timeout[] = []
 
@@ -77,24 +84,43 @@ export default class LazyPlugin extends Plugin {
   }
 
   /**
-   * Get the startup type for a given pluginId, depending on whether the user
-   * is on desktop or mobile. Fallback to Obsidian's current loading method
-   * (enabled/disabled) if no configuration is found for this plugin.
+   * Get the startup type for a given pluginId, falling back to Obsidian's current
+   * loading method (enabled/disabled) if no configuration is found for this plugin.
    */
   getPluginStartup (pluginId: string): LoadingMethod {
-    let value
-    if (Platform.isMobile) value = this.settings.plugins?.[pluginId]?.startupMobile
-    return value ||
-      this.settings.plugins?.[pluginId]?.startupType ||
+    return this.settings.plugins?.[pluginId]?.startupType ||
+      this.settings.defaultStartupType ||
       (this.app.plugins.enabledPlugins.has(pluginId) ? LoadingMethod.instant : LoadingMethod.disabled)
   }
 
   async loadSettings () {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData())
+    this.data = Object.assign({}, DEFAULT_SETTINGS, await this.loadData())
+
+    // Migration from from plugin version <1.0.6
+    // This will be deleted in a few weeks.
+    if (this.data.hasOwnProperty('plugins')) {
+      ['plugins', 'defaultStartupType', 'shortDelaySeconds', 'longDelaySeconds'].forEach(key => {
+        // @ts-ignore
+        this.data.desktop[key] = this.data[key]
+        // @ts-ignore
+        delete this.data[key]
+      })
+    }
+
+    // If user has dual mobile/desktop settings enabled
+    if (this.data.dualConfigs && Platform.isMobile) {
+      if (!this.data.mobile) {
+        // No existing configuration - copy the desktop one
+        this.data.mobile = Object.assign({}, this.data.desktop)
+      }
+      this.settings = this.data.mobile
+    } else {
+      this.settings = this.data.desktop
+    }
   }
 
   async saveSettings () {
-    await this.saveData(this.settings)
+    await this.saveData(this.data)
   }
 
   /**
@@ -106,10 +132,7 @@ export default class LazyPlugin extends Plugin {
     for (const plugin of this.manifests) {
       if (!this.settings.plugins?.[plugin.id]?.startupType) {
         // There is no existing setting for this plugin, so create one
-        await this.updatePluginSettings(plugin.id,
-          this.settings.defaultStartupType ||
-          (this.app.plugins.enabledPlugins.has(plugin.id) ? LoadingMethod.instant : LoadingMethod.disabled)
-        )
+        await this.updatePluginSettings(plugin.id, this.getPluginStartup(plugin.id))
       }
     }
   }
@@ -118,13 +141,7 @@ export default class LazyPlugin extends Plugin {
    * Update an individual plugin's configuration in the settings file
    */
   async updatePluginSettings (pluginId: string, startupType: LoadingMethod) {
-    const settings = this.settings.plugins[pluginId] || { startupType }
-    if (Platform.isMobile) {
-      settings.startupMobile = startupType
-    } else {
-      settings.startupType = startupType
-    }
-    this.settings.plugins[pluginId] = settings
+    this.settings.plugins[pluginId] = { startupType }
     await this.saveSettings()
   }
 
