@@ -70,7 +70,7 @@ export default class LazyPlugin extends Plugin {
           const delay = this.manifests.findIndex(x => x.id === pluginId) * 40
           const timeout = setTimeout(async () => {
             if (!obsidian.plugins?.[pluginId]?._loaded) {
-              if (this.settings.showConsoleLog) {
+              if (this.data.showConsoleLog) {
                 console.log(`Starting ${pluginId} after a ${startupType} delay`)
               }
               await obsidian.enablePlugin(pluginId)
