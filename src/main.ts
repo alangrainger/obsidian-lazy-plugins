@@ -156,11 +156,12 @@ export default class LazyPlugin extends Plugin {
     // Clear any pending timeouts
     this.pendingTimeouts.forEach(timeout => clearTimeout(timeout))
     // Iterate over the configured plugins
-    for (const [pluginId, data] of Object.entries(this.settings.plugins)) {
-      if (data.startupType === LoadingMethod.short || data.startupType === LoadingMethod.long) {
-        await this.app.plugins.disablePlugin(pluginId)
-        await this.app.plugins.enablePluginAndSave(pluginId)
-        console.log(`Set ${pluginId} back to instant start`)
+    for (const plugin of this.manifests) {
+      const startupType = this.settings.plugins?.[plugin.id]?.startupType
+      if (startupType === LoadingMethod.short || startupType === LoadingMethod.long) {
+        await this.app.plugins.disablePlugin(plugin.id)
+        await this.app.plugins.enablePluginAndSave(plugin.id)
+        console.log(`Set ${plugin.id} back to instant start`)
       }
     }
   }
