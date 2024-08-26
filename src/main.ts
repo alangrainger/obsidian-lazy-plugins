@@ -96,17 +96,6 @@ export default class LazyPlugin extends Plugin {
   async loadSettings () {
     this.data = Object.assign({}, DEFAULT_SETTINGS, await this.loadData())
 
-    // Migration from from plugin version <1.0.6
-    // This will be deleted in a few weeks.
-    if (this.data.hasOwnProperty('plugins')) {
-      ['plugins', 'defaultStartupType', 'shortDelaySeconds', 'longDelaySeconds'].forEach(key => {
-        // @ts-ignore
-        this.data.desktop[key] = this.data[key]
-        // @ts-ignore
-        delete this.data[key]
-      })
-    }
-
     // If user has dual mobile/desktop settings enabled
     if (this.data.dualConfigs && Platform.isMobile) {
       if (!this.data.mobile) {

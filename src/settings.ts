@@ -24,6 +24,7 @@ export const DEFAULT_DEVICE_SETTINGS: DeviceSettings = {
 export interface LazySettings {
   dualConfigs: boolean;
   showConsoleLog: boolean;
+  showDescriptions: boolean;
   desktop: DeviceSettings;
   mobile?: DeviceSettings;
 }
@@ -31,6 +32,7 @@ export interface LazySettings {
 export const DEFAULT_SETTINGS: LazySettings = {
   dualConfigs: false,
   showConsoleLog: false,
+  showDescriptions: true,
   desktop: DEFAULT_DEVICE_SETTINGS
 }
 
@@ -118,6 +120,17 @@ export class SettingsTab extends PluginSettingTab {
       .setHeading()
 
     new Setting(containerEl)
+      .setName('Show plugin descriptions')
+      .addToggle(toggle => {
+        toggle
+          .setValue(this.lazyPlugin.data.showDescriptions)
+          .onChange(async (value) => {
+            this.lazyPlugin.data.showDescriptions = value
+            await this.lazyPlugin.saveSettings()
+            this.display()
+          })
+      })
+    new Setting(containerEl)
       .setName('Set the delay for all plugins at once')
       .addDropdown(dropdown => {
         dropdown.addOption('', 'Set all plugins to be:')
@@ -133,16 +146,19 @@ export class SettingsTab extends PluginSettingTab {
           await this.lazyPlugin.saveSettings()
         })
       })
+
+    new Setting(containerEl)
+      .setName('Plugins')
+      .setHeading()
+
     // Add the delay settings for each installed plugin
     this.lazyPlugin.manifests
       .forEach(plugin => {
         new Setting(containerEl)
           .setName(plugin.name)
-          .setDesc(plugin.description)
           .addDropdown(dropdown => {
             this.dropdowns.push(dropdown)
             this.addDelayOptions(dropdown)
-
             dropdown
               .setValue(this.lazyPlugin.getPluginStartup(plugin.id))
               .onChange(async (value: LoadingMethod) => {
@@ -150,6 +166,12 @@ export class SettingsTab extends PluginSettingTab {
                 await this.lazyPlugin.updatePluginSettings(plugin.id, value)
                 this.lazyPlugin.setPluginStartup(plugin.id).then()
               })
+          })
+          .then(setting => {
+            if (this.lazyPlugin.data.showDescriptions) {
+              // Show or hide the plugin description depending on the user's choice
+              setting.setDesc(plugin.description)
+            }
           })
       })
   }
