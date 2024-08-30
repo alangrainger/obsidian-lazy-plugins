@@ -2,16 +2,6 @@
 
 Load plugins with a delay on Obsidian startup, so that you can get your app startup down into the sub-second loading time.
 
+**Important:** Please note that it may take up to 2 restarts of Obsidian for all the settings to work correctly, if it's the first time you're using the plugin. This will only be an issue after the very first install.
+
 ![](./screenshot.png)
-
-## Installation
-
-You will need to install this plugin with BRAT until it is in the Community Plugin store.
-
-1. Install BRAT from the Community Plugins store ([direct link](https://obsidian.md/plugins?id=obsidian42-brat)).
-
-2. Go into the settings for BRAT and choose **Add Beta plugin**.
-
-3. Paste in `https://github.com/alangrainger/obsidian-lazy-plugins` and click **Add Plugin**.
-
-4. Go back to the Plugins settings page, and enable the **Lazy Plugin Loader** plugin:
