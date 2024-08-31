@@ -5,26 +5,31 @@ interface PluginSettings {
   startupType: LoadingMethod;
 }
 
+// Settings per device
 export interface DeviceSettings {
   [key: string]: any;
 
   shortDelaySeconds: number;
   longDelaySeconds: number;
+  delayBetweenPlugins: number;
   defaultStartupType: LoadingMethod | null;
+  showDescriptions: boolean;
   plugins: { [pluginId: string]: PluginSettings };
 }
 
 export const DEFAULT_DEVICE_SETTINGS: DeviceSettings = {
   shortDelaySeconds: 5,
   longDelaySeconds: 15,
+  delayBetweenPlugins: 40, // milliseconds
   defaultStartupType: null,
+  showDescriptions: true,
   plugins: {}
 }
 
+// Global settings for the plugin
 export interface LazySettings {
   dualConfigs: boolean;
   showConsoleLog: boolean;
-  showDescriptions: boolean;
   desktop: DeviceSettings;
   mobile?: DeviceSettings;
 }
@@ -32,7 +37,6 @@ export interface LazySettings {
 export const DEFAULT_SETTINGS: LazySettings = {
   dualConfigs: false,
   showConsoleLog: false,
-  showDescriptions: true,
   desktop: DEFAULT_DEVICE_SETTINGS
 }
 
@@ -123,9 +127,9 @@ export class SettingsTab extends PluginSettingTab {
       .setName('Show plugin descriptions')
       .addToggle(toggle => {
         toggle
-          .setValue(this.lazyPlugin.data.showDescriptions)
+          .setValue(this.lazyPlugin.settings.showDescriptions)
           .onChange(async (value) => {
-            this.lazyPlugin.data.showDescriptions = value
+            this.lazyPlugin.settings.showDescriptions = value
             await this.lazyPlugin.saveSettings()
             this.display()
           })
@@ -168,7 +172,7 @@ export class SettingsTab extends PluginSettingTab {
               })
           })
           .then(setting => {
-            if (this.lazyPlugin.data.showDescriptions) {
+            if (this.lazyPlugin.settings.showDescriptions) {
               // Show or hide the plugin description depending on the user's choice
               setting.setDesc(plugin.description)
             }

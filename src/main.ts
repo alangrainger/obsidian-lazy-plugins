@@ -66,7 +66,7 @@ export default class LazyPlugin extends Plugin {
           // Add a short additional delay to each plugin, for two purposes:
           // 1. Have them load in a consistent order, which helps them appear in the sidebar in the same order
           // 2. Stagger them slightly so there's not a big slowdown when they all fire at once
-          const delay = this.manifests.findIndex(x => x.id === pluginId) * 40
+          const delay = this.manifests.findIndex(x => x.id === pluginId) * this.settings.delayBetweenPlugins
           const timeout = setTimeout(async () => {
             if (!obsidian.plugins?.[pluginId]?._loaded) {
               if (this.data.showConsoleLog) {
