@@ -133,13 +133,29 @@ export default class LazyPlugin extends Plugin {
     await this.saveSettings()
   }
 
-  /**
+  /*
+   * Originally this was set up so that when the plugin unloaded, it would enablePluginAndSave()
+   * the other plugins based on their Lazy Loader startup config.
+   *
+   * The problem with that is that the onunload() function is called during plugin *update* also,
+   * which means that every time you get an update for this plugin, it would cause:
+   *
+   * a) A slowdown across the vault for the next 1-2 restarts.
+   * b) The possibility of plugins being loaded twice / duplicated.
+   *
+   * Since across all users, updating the plugin is common, and uninstalling the plugin is less
+   * common, I decided to remove this function.
+   *
+   * I apologise to the people who have to manually re-enable their plugins once they uninstall this one :(
+   *
+   * --------------------
+   *
    * When the Lazy Loader plugin is disabled / deleted from Obsidian, iterate over
    * the configured plugins and re-enable any that are set to be delayed.
    *
    * This will cause a short slowdown as each plugin has to be disabled and then
    * re-enabled to save its new startup state.
-   */
+   *
   async onunload () {
     // Clear any pending timeouts
     this.pendingTimeouts.forEach(timeout => clearTimeout(timeout))
@@ -152,5 +168,5 @@ export default class LazyPlugin extends Plugin {
         console.log(`Set ${plugin.id} back to instant start`)
       }
     }
-  }
+  } */
 }
