@@ -1,5 +1,6 @@
 import { Platform, Plugin, PluginManifest } from 'obsidian'
 import {
+  DEFAULT_DEVICE_SETTINGS,
   DEFAULT_SETTINGS,
   DeviceSettings,
   LazySettings,
@@ -39,34 +40,33 @@ export default class LazyPlugin extends Plugin {
     const obsidian = this.app.plugins
 
     const startupType = this.getPluginStartup(pluginId)
+    const isActiveOnStartup = obsidian.enabledPlugins.has(pluginId)
     const isRunning = obsidian.plugins?.[pluginId]?._loaded
-
-    // Check if the plugin is loaded by Obsidian
-    if (obsidian.enabledPlugins.has(pluginId)) {
-      // Disable it and save, so that plugin loading is handled solely by Lazy Loader
-      // https://github.com/obsidianmd/obsidian-releases/pull/3998#issuecomment-2318012016
-      await obsidian.disablePluginAndSave(pluginId)
-    }
 
     switch (startupType) {
       // For disabled plugins
       case LoadingMethod.disabled:
-        if (isRunning) await obsidian.disablePlugin(pluginId)
+        await obsidian.disablePluginAndSave(pluginId)
         break
       // For instant-start plugins
       case LoadingMethod.instant:
-        if (!isRunning) await obsidian.enablePlugin(pluginId)
+        if (!isActiveOnStartup && !isRunning) await obsidian.enablePluginAndSave(pluginId)
         break
       // For plugins with a delay
       case LoadingMethod.short:
       case LoadingMethod.long:
-        if (!isRunning) {
+        if (isActiveOnStartup) {
+          // Disable and save so that it won't auto-start next time
+          await obsidian.disablePluginAndSave(pluginId)
+          // Immediately re-enable, since the plugin is already active and in-use
+          await obsidian.enablePlugin(pluginId)
+        } else if (!isRunning) {
           // Start with a delay
           const seconds = startupType === LoadingMethod.short ? this.settings.shortDelaySeconds : this.settings.longDelaySeconds
           // Add a short additional delay to each plugin, for two purposes:
           // 1. Have them load in a consistent order, which helps them appear in the sidebar in the same order
           // 2. Stagger them slightly so there's not a big slowdown when they all fire at once
-          const delay = this.manifests.findIndex(x => x.id === pluginId) * this.settings.delayBetweenPlugins
+          const delay = this.manifests.findIndex(x => x.id === pluginId) * (this.settings.delayBetweenPlugins || 1)
           const timeout = setTimeout(async () => {
             if (!obsidian.plugins?.[pluginId]?._loaded) {
               if (this.data.showConsoleLog) {
@@ -94,12 +94,16 @@ export default class LazyPlugin extends Plugin {
 
   async loadSettings () {
     this.data = Object.assign({}, DEFAULT_SETTINGS, await this.loadData())
+    // Object.assign only works 1 level deep, so need to clone the sub-level as well
+    this.data.desktop = Object.assign({}, DEFAULT_DEVICE_SETTINGS, this.data.desktop)
 
     // If user has dual mobile/desktop settings enabled
     if (this.data.dualConfigs && Platform.isMobile) {
       if (!this.data.mobile) {
         // No existing configuration - copy the desktop one
         this.data.mobile = Object.assign({}, this.data.desktop)
+      } else {
+        this.data.mobile = Object.assign({}, DEFAULT_DEVICE_SETTINGS, this.data.mobile)
       }
       this.settings = this.data.mobile
     } else {
