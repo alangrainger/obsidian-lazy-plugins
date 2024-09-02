@@ -1,5 +1,5 @@
 ---
-name: Some plugin doesn't work correctly
+name: 1. Some plugin doesn't work correctly
 about: Some plugin doesn't work correctly with Lazy Loader
 title: ''
 labels: ''
