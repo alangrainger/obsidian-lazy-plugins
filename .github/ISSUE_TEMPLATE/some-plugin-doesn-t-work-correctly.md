@@ -1,6 +1,6 @@
 ---
-name: Issue with some plugin
-about: Some plugin doesn't work with Lazy Loader
+name: Some plugin doesn't work correctly
+about: Some plugin doesn't work correctly with Lazy Loader
 title: ''
 labels: ''
 assignees: ''
