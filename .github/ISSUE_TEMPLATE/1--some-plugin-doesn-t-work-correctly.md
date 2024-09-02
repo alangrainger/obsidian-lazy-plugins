@@ -1,15 +1,38 @@
 ---
 name: 1. Some plugin doesn't work correctly
-about: Some plugin doesn't work correctly with Lazy Loader
+about: Create a report to help us improve
 title: ''
 labels: ''
 assignees: ''
 
 ---
 
-Before you create this issue, do this first:
+**Describe the bug**
+A clear and concise description of what the bug is.
 
-1. Set the plugin to be the **Instant** startup method.
-2. **Restart Obsidian twice.**
+**To Reproduce**
+Steps to reproduce the behavior:
+1. Go to '...'
+2. Click on '....'
+3. Scroll down to '....'
+4. See error
 
-And see if that solves the problem. If it does, you'll need to keep that plugin set as "Instant" type for it to work.
+**Expected behavior**
+A clear and concise description of what you expected to happen.
+
+**Screenshots**
+If applicable, add screenshots to help explain your problem.
+
+**Desktop (please complete the following information):**
+ - OS: [e.g. iOS]
+ - Browser [e.g. chrome, safari]
+ - Version [e.g. 22]
+
+**Smartphone (please complete the following information):**
+ - Device: [e.g. iPhone6]
+ - OS: [e.g. iOS8.1]
+ - Browser [e.g. stock browser, safari]
+ - Version [e.g. 22]
+
+**Additional context**
+Add any other context about the problem here.
