@@ -58,6 +58,7 @@ export class SettingsTab extends PluginSettingTab {
   app: App
   lazyPlugin: LazyPlugin
   dropdowns: DropdownComponent[] = []
+  filter: LoadingMethod | undefined
 
   constructor (app: App, plugin: LazyPlugin) {
     super(app, plugin)
@@ -151,20 +152,32 @@ export class SettingsTab extends PluginSettingTab {
         })
       })
 
+    // Add the filter buttons
     new Setting(containerEl)
       .setName('Plugins')
       .setHeading()
+      .setDesc('Filter by: ')
+      .then(setting => {
+        this.addFilterButton(setting.descEl, 'All')
+        Object.keys(LoadingMethods)
+          .forEach(key => this.addFilterButton(setting.descEl, LoadingMethods[key as LoadingMethod], key as LoadingMethod))
+      })
 
     // Add the delay settings for each installed plugin
     this.lazyPlugin.manifests
       .forEach(plugin => {
+        const currentValue = this.lazyPlugin.getPluginStartup(plugin.id)
+
+        // Filter the list of plugins if there is a filter specified
+        if (this.filter && currentValue !== this.filter) return
+
         new Setting(containerEl)
           .setName(plugin.name)
           .addDropdown(dropdown => {
             this.dropdowns.push(dropdown)
             this.addDelayOptions(dropdown)
             dropdown
-              .setValue(this.lazyPlugin.getPluginStartup(plugin.id))
+              .setValue(currentValue)
               .onChange(async (value: LoadingMethod) => {
                 // Update the config file, and disable/enable the plugin if needed
                 await this.lazyPlugin.updatePluginSettings(plugin.id, value)
@@ -188,5 +201,17 @@ export class SettingsTab extends PluginSettingTab {
       .forEach(key => {
         el.addOption(key, LoadingMethods[key as LoadingMethod])
       })
+  }
+
+  /**
+   * Add a filter button in the header of the plugin list
+   */
+  addFilterButton (el: HTMLElement, text: string, value?: LoadingMethod) {
+    const link = el.createEl('button', { text })
+    link.addClass('lazy-plugin-filter')
+    link.onclick = () => {
+      this.filter = value
+      this.display()
+    }
   }
 }
