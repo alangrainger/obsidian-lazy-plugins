@@ -13,6 +13,7 @@ const lazyPluginId = require('../manifest.json').id
 export default class LazyPlugin extends Plugin {
   data: LazySettings
   settings: DeviceSettings
+  device = 'global'
   manifests: PluginManifest[]
   pendingTimeouts: NodeJS.Timeout[] = []
 
@@ -107,8 +108,10 @@ export default class LazyPlugin extends Plugin {
         this.data.mobile = Object.assign({}, DEFAULT_DEVICE_SETTINGS, this.data.mobile)
       }
       this.settings = this.data.mobile
+      this.device = 'mobile'
     } else {
       this.settings = this.data.desktop
+      this.device = Platform.isMobile ? 'global' : 'desktop'
     }
   }
 

@@ -5,7 +5,7 @@ interface PluginSettings {
   startupType: LoadingMethod;
 }
 
-// Settings per device
+// Settings per device (desktop/mobile)
 export interface DeviceSettings {
   [key: string]: any;
 
@@ -75,7 +75,7 @@ export class SettingsTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName('Separate desktop/mobile configuration')
       .setDesc('Enable this if you want to have different settings depending whether you\'re using a desktop or mobile device. ' +
-        'All of the settings below can be configured differently on desktop and mobile.')
+        `All of the settings below can be configured differently on desktop and mobile. You're currently editing the ${this.lazyPlugin.device} settings.`)
       .addToggle(toggle => {
         toggle
           .setValue(this.lazyPlugin.data.dualConfigs)
@@ -84,6 +84,7 @@ export class SettingsTab extends PluginSettingTab {
             await this.lazyPlugin.saveSettings()
             // Refresh the settings to make sure the mobile section is configured
             await this.lazyPlugin.loadSettings()
+            this.display()
           })
       })
 
