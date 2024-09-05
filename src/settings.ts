@@ -59,6 +59,7 @@ export class SettingsTab extends PluginSettingTab {
   lazyPlugin: LazyPlugin
   dropdowns: DropdownComponent[] = []
   filter: LoadingMethod | undefined
+  containerEl: HTMLElement
 
   constructor (app: App, plugin: LazyPlugin) {
     super(app, plugin)
@@ -66,16 +67,29 @@ export class SettingsTab extends PluginSettingTab {
     this.lazyPlugin = plugin
   }
 
-  display (): void {
+  async display () {
     const { containerEl } = this
+    this.containerEl = containerEl
+
+    // Load the settings from disk when the settings modal is displayed.
+    // This avoids the issue where someone has synced the settings from another device,
+    // but since the plugin has already been loaded, the new settings do not show up.
+    await this.lazyPlugin.loadSettings()
+
+    this.buildDom()
+  }
+
+  /**
+   * Build the Settings modal DOM elements
+   */
+  buildDom () {
     const pluginSettings = this.lazyPlugin.settings.plugins
+    this.containerEl.empty()
 
-    containerEl.empty()
-
-    new Setting(containerEl)
+    new Setting(this.containerEl)
       .setName('Separate desktop/mobile configuration')
       .setDesc('Enable this if you want to have different settings depending whether you\'re using a desktop or mobile device. ' +
-        `All of the settings below can be configured differently on desktop and mobile. You're currently editing the ${this.lazyPlugin.device} settings.`)
+        `All of the settings below can be configured differently on desktop and mobile. You're currently using the ${this.lazyPlugin.device} settings.`)
       .addToggle(toggle => {
         toggle
           .setValue(this.lazyPlugin.data.dualConfigs)
@@ -84,12 +98,12 @@ export class SettingsTab extends PluginSettingTab {
             await this.lazyPlugin.saveSettings()
             // Refresh the settings to make sure the mobile section is configured
             await this.lazyPlugin.loadSettings()
-            this.display()
+            this.buildDom()
           })
       })
 
-    new Setting(containerEl)
-      .setName('Global plugin delay settings')
+    new Setting(this.containerEl)
+      .setName('Lazy Loader settings')
       .setHeading()
 
     // Create the two timer settings fields
@@ -98,7 +112,7 @@ export class SettingsTab extends PluginSettingTab {
       longDelaySeconds: 'Long delay (seconds)'
     })
       .forEach(([key, name]) => {
-        new Setting(containerEl)
+        new Setting(this.containerEl)
           .setName(name)
           .addText(text => text
             .setValue(this.lazyPlugin.settings[key].toString())
@@ -108,7 +122,7 @@ export class SettingsTab extends PluginSettingTab {
             }))
       })
 
-    new Setting(containerEl)
+    new Setting(this.containerEl)
       .setName('Default startup type for new plugins')
       .addDropdown(dropdown => {
         dropdown.addOption('', 'Nothing configured')
@@ -121,11 +135,7 @@ export class SettingsTab extends PluginSettingTab {
           })
       })
 
-    new Setting(containerEl)
-      .setName('Individual plugin delay settings')
-      .setHeading()
-
-    new Setting(containerEl)
+    new Setting(this.containerEl)
       .setName('Show plugin descriptions')
       .addToggle(toggle => {
         toggle
@@ -133,10 +143,10 @@ export class SettingsTab extends PluginSettingTab {
           .onChange(async (value) => {
             this.lazyPlugin.settings.showDescriptions = value
             await this.lazyPlugin.saveSettings()
-            this.display()
+            this.buildDom()
           })
       })
-    new Setting(containerEl)
+    new Setting(this.containerEl)
       .setName('Set the delay for all plugins at once')
       .addDropdown(dropdown => {
         dropdown.addOption('', 'Set all plugins to be:')
@@ -154,7 +164,7 @@ export class SettingsTab extends PluginSettingTab {
       })
 
     // Add the filter buttons
-    new Setting(containerEl)
+    new Setting(this.containerEl)
       .setName('Plugins')
       .setHeading()
       .setDesc('Filter by: ')
@@ -172,7 +182,7 @@ export class SettingsTab extends PluginSettingTab {
         // Filter the list of plugins if there is a filter specified
         if (this.filter && currentValue !== this.filter) return
 
-        new Setting(containerEl)
+        new Setting(this.containerEl)
           .setName(plugin.name)
           .addDropdown(dropdown => {
             this.dropdowns.push(dropdown)
@@ -212,7 +222,7 @@ export class SettingsTab extends PluginSettingTab {
     link.addClass('lazy-plugin-filter')
     link.onclick = () => {
       this.filter = value
-      this.display()
+      this.buildDom()
     }
   }
 }
