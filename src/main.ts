@@ -103,7 +103,7 @@ export default class LazyPlugin extends Plugin {
     if (this.data.dualConfigs && Platform.isMobile) {
       if (!this.data.mobile) {
         // No existing configuration - copy the desktop one
-        this.data.mobile = Object.assign({}, this.data.desktop)
+        this.data.mobile = JSON.parse(JSON.stringify(this.data.desktop)) as DeviceSettings
       } else {
         this.data.mobile = Object.assign({}, DEFAULT_DEVICE_SETTINGS, this.data.mobile)
       }
