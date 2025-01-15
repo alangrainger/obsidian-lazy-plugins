@@ -5,6 +5,7 @@ import {
   DeviceSettings,
   LazySettings,
   LoadingMethod,
+  PluginSettings,
   SettingsTab
 } from './settings'
 
@@ -31,7 +32,15 @@ export default class LazyPlugin extends Plugin {
     this.addSettingTab(new SettingsTab(this.app, this))
 
     // Iterate over the installed plugins and load them with the specified delay
-    this.manifests.forEach(plugin => this.setPluginStartup(plugin.id))
+    if (this.settings.enableDependencies && this.settings.loadOrder) {
+      // For user's who have the plugins loading with dependencies
+      for (const pluginId of this.settings.loadOrder) {
+        await this.setPluginStartup(pluginId)
+      }
+    } else {
+      // Normal non-dependency loading
+      this.manifests.forEach(plugin => this.setPluginStartup(plugin.id))
+    }
   }
 
   /**
@@ -128,7 +137,7 @@ export default class LazyPlugin extends Plugin {
     for (const plugin of this.manifests) {
       if (!this.settings.plugins?.[plugin.id]?.startupType) {
         // There is no existing setting for this plugin, so create one
-        await this.updatePluginSettings(plugin.id, this.getPluginStartup(plugin.id))
+        await this.updatePluginSettings(plugin.id, { startupType: this.getPluginStartup(plugin.id) })
       }
     }
   }
@@ -136,8 +145,8 @@ export default class LazyPlugin extends Plugin {
   /**
    * Update an individual plugin's configuration in the settings file
    */
-  async updatePluginSettings (pluginId: string, startupType: LoadingMethod) {
-    this.settings.plugins[pluginId] = { startupType }
+  async updatePluginSettings (pluginId: string, settings: PluginSettings) {
+    this.settings.plugins[pluginId] = Object.assign(this.settings.plugins[pluginId] || {}, settings)
     await this.saveSettings()
   }
 
