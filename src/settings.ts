@@ -1,8 +1,16 @@
 import { App, DropdownComponent, PluginSettingTab, Setting } from 'obsidian'
 import LazyPlugin from './main'
 
-interface PluginSettings {
-  startupType: LoadingMethod;
+export enum LoadingMethod {
+  disabled = 'disabled',
+  instant = 'instant',
+  short = 'short',
+  long = 'long'
+}
+
+export interface PluginSettings {
+  startupType?: LoadingMethod;
+  loadAfter?: string;
 }
 
 // Settings per device (desktop/mobile)
@@ -14,7 +22,9 @@ export interface DeviceSettings {
   delayBetweenPlugins: number;
   defaultStartupType: LoadingMethod | null;
   showDescriptions: boolean;
+  enableDependencies: boolean;
   plugins: { [pluginId: string]: PluginSettings };
+  loadOrder: string[];
 }
 
 export const DEFAULT_DEVICE_SETTINGS: DeviceSettings = {
@@ -23,7 +33,9 @@ export const DEFAULT_DEVICE_SETTINGS: DeviceSettings = {
   delayBetweenPlugins: 40, // milliseconds
   defaultStartupType: null,
   showDescriptions: true,
-  plugins: {}
+  enableDependencies: false,
+  plugins: {},
+  loadOrder: []
 }
 
 // Global settings for the plugin
@@ -40,13 +52,6 @@ export const DEFAULT_SETTINGS: LazySettings = {
   desktop: DEFAULT_DEVICE_SETTINGS
 }
 
-export enum LoadingMethod {
-  disabled = 'disabled',
-  instant = 'instant',
-  short = 'short',
-  long = 'long'
-}
-
 const LoadingMethods: { [key in LoadingMethod]: string } = {
   disabled: '⛔ Disable plugin',
   instant: '⚡ Instant',
@@ -58,13 +63,17 @@ export class SettingsTab extends PluginSettingTab {
   app: App
   lazyPlugin: LazyPlugin
   dropdowns: DropdownComponent[] = []
-  filter: LoadingMethod | undefined
+  filterMethod: LoadingMethod | undefined
+  filterString: string | undefined
   containerEl: HTMLElement
+  pluginListContainer: HTMLElement
+  pluginSettings: { [pluginId: string]: PluginSettings } = {}
 
   constructor (app: App, plugin: LazyPlugin) {
     super(app, plugin)
     this.app = app
     this.lazyPlugin = plugin
+    this.pluginSettings = this.lazyPlugin.settings.plugins
   }
 
   async display () {
@@ -83,7 +92,6 @@ export class SettingsTab extends PluginSettingTab {
    * Build the Settings modal DOM elements
    */
   buildDom () {
-    const pluginSettings = this.lazyPlugin.settings.plugins
     this.containerEl.empty()
 
     new Setting(this.containerEl)
@@ -146,6 +154,20 @@ export class SettingsTab extends PluginSettingTab {
             this.buildDom()
           })
       })
+
+    new Setting(this.containerEl)
+      .setName('Enable dependencies')
+      .setDesc('Turn this on if you need to have some plugins wait for another plugin to load first')
+      .addToggle(toggle => {
+        toggle
+          .setValue(this.lazyPlugin.settings.enableDependencies)
+          .onChange(async (value) => {
+            this.lazyPlugin.settings.enableDependencies = value
+            await this.lazyPlugin.saveSettings()
+            this.buildDom()
+          })
+      })
+
     new Setting(this.containerEl)
       .setName('Set the delay for all plugins at once')
       .addDropdown(dropdown => {
@@ -154,7 +176,7 @@ export class SettingsTab extends PluginSettingTab {
         dropdown.onChange(async (value: LoadingMethod) => {
           // Update all plugins and save the config, but don't reload the plugins (would slow the UI down)
           this.lazyPlugin.manifests.forEach(plugin => {
-            pluginSettings[plugin.id] = { startupType: value }
+            this.pluginSettings[plugin.id] = { startupType: value }
           })
           // Update all the dropdowns
           this.dropdowns.forEach(dropdown => dropdown.setValue(value))
@@ -168,21 +190,38 @@ export class SettingsTab extends PluginSettingTab {
       .setName('Plugins')
       .setHeading()
       .setDesc('Filter by: ')
+      // Add the buttons to filter by startup method
       .then(setting => {
         this.addFilterButton(setting.descEl, 'All')
         Object.keys(LoadingMethods)
           .forEach(key => this.addFilterButton(setting.descEl, LoadingMethods[key as LoadingMethod], key as LoadingMethod))
       })
+    new Setting(this.containerEl)
+      // Add a free-text filter
+      .addText(text => text
+        .setPlaceholder('Type to filter list')
+        .onChange(value => {
+          this.filterString = value
+          this.buildPluginList()
+        }))
 
+    // Add an element to contain the plugin list
+    this.pluginListContainer = this.containerEl.createEl('div')
+    this.buildPluginList()
+  }
+
+  buildPluginList () {
+    this.pluginListContainer.textContent = ''
     // Add the delay settings for each installed plugin
     this.lazyPlugin.manifests
       .forEach(plugin => {
         const currentValue = this.lazyPlugin.getPluginStartup(plugin.id)
 
         // Filter the list of plugins if there is a filter specified
-        if (this.filter && currentValue !== this.filter) return
+        if (this.filterMethod && currentValue !== this.filterMethod) return
+        if (this.filterString && !plugin.name.toLowerCase().includes(this.filterString.toLowerCase())) return
 
-        new Setting(this.containerEl)
+        new Setting(this.pluginListContainer)
           .setName(plugin.name)
           .addDropdown(dropdown => {
             this.dropdowns.push(dropdown)
@@ -199,6 +238,23 @@ export class SettingsTab extends PluginSettingTab {
             if (this.lazyPlugin.settings.showDescriptions) {
               // Show or hide the plugin description depending on the user's choice
               setting.setDesc(plugin.description)
+            }
+            if (this.lazyPlugin.settings.enableDependencies) {
+              // Plugin dependencies
+              setting.addDropdown(dropdown => {
+                dropdown.addOption('', 'Load after:')
+                this.lazyPlugin.manifests
+                  .filter(x => x.id !== plugin.id && this.pluginSettings?.[x.id]?.startupType !== LoadingMethod.disabled)
+                  .forEach(x => dropdown.addOption(x.id, x.name))
+
+                dropdown
+                  .setValue(this.pluginSettings?.[plugin.id]?.loadAfter || '')
+                  .onChange(async (value: LoadingMethod) => {
+                    // Update the config file, and disable/enable the plugin if needed
+                    await this.lazyPlugin.updatePluginSettings(plugin.id, value)
+                    await this.saveLoadOrder()
+                  })
+              })
             }
           })
       })
@@ -221,8 +277,46 @@ export class SettingsTab extends PluginSettingTab {
     const link = el.createEl('button', { text })
     link.addClass('lazy-plugin-filter')
     link.onclick = () => {
-      this.filter = value
-      this.buildDom()
+      this.filterMethod = value
+      this.buildPluginList()
     }
+  }
+
+  /**
+   * For people who have dependencies set, this creates a plugin load order taking those dependencies into account.
+   */
+  async saveLoadOrder () {
+    const plugins = this.lazyPlugin.settings.plugins
+
+    // Get the list of all plugin IDs, and order them into their basic groups
+    const toProcess = [
+      ...Object.keys(plugins).filter(id => plugins[id].startupType === LoadingMethod.instant),
+      ...Object.keys(plugins).filter(id => plugins[id].startupType === LoadingMethod.short),
+      ...Object.keys(plugins).filter(id => plugins[id].startupType === LoadingMethod.long)
+    ]
+    const total = toProcess.length
+    let count = 0
+
+    const loadOrder: string[] = []
+    while (toProcess.length && count < total + 10) {
+      const id = toProcess.shift()
+      if (!id) break
+
+      // Check if this plugin is dependent on another
+      if (
+        plugins[id].loadAfter && // If this plugin has a parent specified
+        !loadOrder.find(x => x === plugins[id].loadAfter) && // And the parent is not yet in the load order
+        plugins?.[plugins[id].loadAfter || '']?.startupType !== LoadingMethod.disabled // And the parent is not disabled
+      ) {
+        // The parent plugin is not yet in the load order, move it to the back of the queue to process again
+        toProcess.push(id)
+      } else {
+        loadOrder.push(id)
+      }
+      // Break if we loop too many times, to protect from people who put two plugins as dependencies of each other
+      count++
+    }
+    this.lazyPlugin.settings.loadOrder = loadOrder
+    await this.lazyPlugin.saveSettings()
   }
 }
