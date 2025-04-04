@@ -8,9 +8,21 @@ export enum LoadingMethod {
   long = 'long'
 }
 
+// Change to store a nullable groupId. If not set, value is taken from manifest?
 export interface PluginSettings {
   startupType?: LoadingMethod;
   loadAfter?: string;
+  groupId?: string[]
+}
+
+// TODO: me - Might be better to have id for plugin => group mapping
+// As that is more easily supportable for backwards compatability
+export interface PluginGroupSettings {
+  enablePluginsDuringStartup: boolean;
+  generateEnableDisableCommands: boolean;
+  startupDelaySeconds?: number;
+  autoAddNewPlugins: boolean;
+  plugins: {};
 }
 
 // Settings per device (desktop/mobile)
@@ -25,6 +37,36 @@ export interface DeviceSettings {
   enableDependencies: boolean;
   plugins: { [pluginId: string]: PluginSettings };
   loadOrder: string[];
+  groups: { [groupId: string]: PluginGroupSettings };
+}
+
+// Default groups have their values from the device settings
+export function createDefaultGroups(device: DeviceSettings): PluginGroupSettings[] {
+  return [{
+    enablePluginsDuringStartup: true,
+    generateEnableDisableCommands: false,
+    startupDelaySeconds: 0,
+    autoAddNewPlugins: device.defaultStartupType == LoadingMethod.disabled,
+    plugins: {}
+  },{
+    enablePluginsDuringStartup: true,
+    generateEnableDisableCommands: false,
+    startupDelaySeconds: device.shortDelaySeconds,
+    autoAddNewPlugins: device.defaultStartupType == LoadingMethod.short,
+    plugins: {}
+  },{
+    enablePluginsDuringStartup: true,
+    generateEnableDisableCommands: false,
+    startupDelaySeconds: device.longDelaySeconds,
+    autoAddNewPlugins: device.defaultStartupType == LoadingMethod.long,
+    plugins: {}
+  },{
+    enablePluginsDuringStartup: false,
+    generateEnableDisableCommands: false,
+    startupDelaySeconds: 0,
+    autoAddNewPlugins: device.defaultStartupType == LoadingMethod.disabled,
+    plugins: {}
+  }];
 }
 
 export const DEFAULT_DEVICE_SETTINGS: DeviceSettings = {
@@ -49,7 +91,7 @@ export interface LazySettings {
 export const DEFAULT_SETTINGS: LazySettings = {
   dualConfigs: false,
   showConsoleLog: false,
-  desktop: DEFAULT_DEVICE_SETTINGS
+  desktop: DEFAULT_DEVICE_SETTINGS,
 }
 
 const LoadingMethods: { [key in LoadingMethod]: string } = {
@@ -67,13 +109,17 @@ export class SettingsTab extends PluginSettingTab {
   filterString: string | undefined
   containerEl: HTMLElement
   pluginListContainer: HTMLElement
+  groupsListContainer: HTMLElement
   pluginSettings: { [pluginId: string]: PluginSettings } = {}
+  groupSettings: { [groupId: string]: PluginGroupSettings } = {}
 
   constructor (app: App, plugin: LazyPlugin) {
     super(app, plugin)
     this.app = app
     this.lazyPlugin = plugin
     this.pluginSettings = this.lazyPlugin.settings.plugins
+    // TODO: me - Unsure of how to map groups
+    this.groupSettings = this.lazyPlugin.settings.groups
   }
 
   async display () {
@@ -208,6 +254,17 @@ export class SettingsTab extends PluginSettingTab {
     // Add an element to contain the plugin list
     this.pluginListContainer = this.containerEl.createEl('div')
     this.buildPluginList()
+
+    // Add an element to contain the groups list
+    // TODO: me - This should default to being hidden by a switch
+    this.groupsListContainer = this.containerEl.createEl('div')
+    this.buildGroupList()
+  }
+
+  buildGroupList() {
+    this.groupsListContainer.textContent = ''
+    // TODO: need to add list of "something" similar to `PluginManifest`
+    this.lazyPlugin.groups.forEach(group => {});
   }
 
   buildPluginList () {

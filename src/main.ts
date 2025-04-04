@@ -5,7 +5,9 @@ import {
   DeviceSettings,
   LazySettings,
   LoadingMethod,
-  SettingsTab
+  PluginGroupSettings,
+  SettingsTab,
+  createDefaultGroups
 } from './settings'
 
 const lazyPluginId = require('../manifest.json').id
@@ -17,7 +19,35 @@ export default class LazyPlugin extends Plugin {
   manifests: PluginManifest[]
   pendingTimeouts: NodeJS.Timeout[] = []
 
-  async onload () {
+  /* Plugin manager code
+    m = Manager.getInstance()
+    m.main = this;
+    await m.loadSettings();
+
+    this.manifests.forEach(/* add new plugins to "Auto-Add" group *\/)
+
+    // TODO: merge `PluginGroupSettings` into `SettingsTab`
+    Manager.getInstance().updateStatusbarItem();
+
+    m.groupsMap
+      .forEach(group => {
+        if (m.generateCommands) {
+          CommandManager.getInstance().AddEnableDisableCommands(group)
+        }
+        if (group.loadAtStartup) {
+          group.startup()
+        }
+      });
+  */
+
+  async loadGroupSettings() {
+    /*
+    loadData
+    select between mobile and desktop
+    */
+  }
+
+  async onload() {
     await this.loadSettings()
 
     // Get the list of installed plugins
@@ -25,6 +55,7 @@ export default class LazyPlugin extends Plugin {
       .filter(plugin =>
         plugin.id !== lazyPluginId &&                  // Filter out the Lazy Loader plugin
         !(Platform.isMobile && plugin.isDesktopOnly))  // Filter out desktop-only plugins from mobile
+      // TODO: me - In a separate branch, enable mobile only plugins
       .sort((a, b) => a.name.localeCompare(b.name))
 
     await this.setInitialPluginsConfiguration()
@@ -37,50 +68,49 @@ export default class LazyPlugin extends Plugin {
   /**
    * Configure and load a plugin based on its startup settings.
    */
-  async setPluginStartup (pluginId: string) {
+  async setPluginStartup(pluginId: string) {
     const obsidian = this.app.plugins
 
-    const startupType = this.getPluginStartup(pluginId)
-    const isActiveOnStartup = obsidian.enabledPlugins.has(pluginId)
-    const isRunning = obsidian.plugins?.[pluginId]?._loaded
+    const groups = this.getPluginsGroups(pluginId).map(groupId => this.settings?.groups[groupId]).filter(group => group.enablePluginsDuringStartup).sort(group => group.startupDelaySeconds)
 
-    switch (startupType) {
-      // For disabled plugins
-      case LoadingMethod.disabled:
-        await obsidian.disablePluginAndSave(pluginId)
-        break
-      // For instant-start plugins
-      case LoadingMethod.instant:
-        if (!isActiveOnStartup && !isRunning) await obsidian.enablePluginAndSave(pluginId)
-        break
-      // For plugins with a delay
-      case LoadingMethod.short:
-      case LoadingMethod.long:
-        if (isActiveOnStartup) {
-          // Disable and save so that it won't auto-start next time
-          await obsidian.disablePluginAndSave(pluginId)
-          // Immediately re-enable, since the plugin is already active and in-use
+    // If there are no groups set to enable during startup, then we
+    // disable the plugin and exit
+    if (!groups) {
+      await obsidian.disablePluginAndSave(pluginId)
+      return
+    }
+
+    // If the plugin is currently active and is not part of a group that
+    // is set to auto-load immediately on startup. Quick disable and then
+    // re-enable the plugin so the plugin doesn't load immediately on
+    // the next startup. In fact, we only care about the first group duing
+    // loading, even though we allow for a plugin to exist in multiple groups
+    const loadGroup = groups[0]
+    const isEnabled = obsidian.enabledPlugins.has(pluginId)
+    const isRunning = obsidian.plugins?.[pluginId]?._loaded
+    const currentlyActive = isEnabled && isRunning
+    if (loadGroup.startupDelaySeconds == 0) {
+      await obsidian.enablePluginAndSave(pluginId)
+    } else if (currentlyActive) {
+      await obsidian.disablePluginAndSave(pluginId)
+      await obsidian.enablePlugin(pluginId)
+    } else if (!isRunning) {
+
+      // Add a short additional delay to each plugin, for two purposes:
+      // 1. Have them load in a consistent order, which helps them appear in the sidebar in the same order
+      // 2. Stagger them slightly so there's not a big slowdown when they all fire at once
+      const stagger = isNaN(this.settings.delayBetweenPlugins) ? 40 : this.settings.delayBetweenPlugins
+      const delay = this.manifests.findIndex(x => x.id === pluginId) * stagger
+      const timeout = setTimeout(async () => {
+        if (!obsidian.plugins?.[pluginId]?._loaded) {
+          if (this.data.showConsoleLog) {
+            console.log(`Starting ${pluginId} after a ${loadGroup.startupDelaySeconds}s delay`)
+          }
           await obsidian.enablePlugin(pluginId)
-        } else if (!isRunning) {
-          // Start with a delay
-          const seconds = startupType === LoadingMethod.short ? this.settings.shortDelaySeconds : this.settings.longDelaySeconds
-          // Add a short additional delay to each plugin, for two purposes:
-          // 1. Have them load in a consistent order, which helps them appear in the sidebar in the same order
-          // 2. Stagger them slightly so there's not a big slowdown when they all fire at once
-          const stagger = isNaN(this.settings.delayBetweenPlugins) ? 40 : this.settings.delayBetweenPlugins
-          const delay = this.manifests.findIndex(x => x.id === pluginId) * stagger
-          const timeout = setTimeout(async () => {
-            if (!obsidian.plugins?.[pluginId]?._loaded) {
-              if (this.data.showConsoleLog) {
-                console.log(`Starting ${pluginId} after a ${startupType} delay`)
-              }
-              await obsidian.enablePlugin(pluginId)
-            }
-          }, seconds * 1000 + delay)
-          // Store the timeout so we can cancel it later if needed during plugin unload
-          this.pendingTimeouts.push(timeout)
         }
-        break
+      }, loadGroup.startupDelaySeconds * 1000 + delay)
+      // Store the timeout so we can cancel it later if needed during plugin unload
+      this.pendingTimeouts.push(timeout)
     }
   }
 
@@ -88,13 +118,34 @@ export default class LazyPlugin extends Plugin {
    * Get the startup type for a given pluginId, falling back to Obsidian's current
    * loading method (enabled/disabled) if no configuration is found for this plugin.
    */
-  getPluginStartup (pluginId: string): LoadingMethod {
+  getPluginStartup(pluginId: string): LoadingMethod {
     return this.settings.plugins?.[pluginId]?.startupType ||
       this.settings.defaultStartupType ||
       (this.app.plugins.enabledPlugins.has(pluginId) ? LoadingMethod.instant : LoadingMethod.disabled)
   }
 
-  async loadSettings () {
+  // TODO: me - Not sure how to map from group to group id
+  getPluginsGroups(pluginId: string): string[] {
+    this.settings.plugins[pluginId].groupIds = Object.assign([], Object.values(LoadingMethod).filter(v => typeof v == "string"), this.settings.plugins[pluginId].groupIds);
+    return this.settings.plugins[pluginId].groupIds
+  }
+
+  // This should only be added for new groups
+  // TODO: me - This needs to not reference `startup_type` if possible
+  // Might need to wait for second cl
+  getAutoAddGroups(pluginId: string): string[] {
+    this.settings.plugins?.[pluginId]
+    var groups = this.settings.groups.filter((id, group) => group.autoAddNewPlugins)
+      .map((id: string, group) => id)
+    if (!groups) {
+      return [this.settings.plugins?.[pluginId]?.startupType ||
+        this.settings.defaultStartupType ||
+        (this.app.plugins.enabledPlugins.has(pluginId) ? LoadingMethod.instant : LoadingMethod.disabled)]
+    }
+    return groups
+  }
+
+  async loadSettings() {
     this.data = Object.assign({}, DEFAULT_SETTINGS, await this.loadData())
     // Object.assign only works 1 level deep, so need to clone the sub-level as well
     this.data.desktop = Object.assign({}, DEFAULT_DEVICE_SETTINGS, this.data.desktop)
@@ -113,9 +164,15 @@ export default class LazyPlugin extends Plugin {
       this.settings = this.data.desktop
       this.device = 'desktop/global'
     }
+
+    // TODO: me - Not sure how groups will be saveable
+    // This should load in the groups from data.json if already present
+    // If not, this creates the default groups based on startup
+    // TODO: me - This would need to also have an ability to switch the auto add target
+    this.settings.groups = Object.assign({}, createDefaultGroups(this.settings), this.settings.groups)
   }
 
-  async saveSettings () {
+  async saveSettings() {
     await this.saveData(this.data)
   }
 
@@ -124,7 +181,7 @@ export default class LazyPlugin extends Plugin {
    * for any new plugin in the future, depending on what default value is chosen in the
    * Settings page.
    */
-  async setInitialPluginsConfiguration () {
+  async setInitialPluginsConfiguration() {
     for (const plugin of this.manifests) {
       if (!this.settings.plugins?.[plugin.id]?.startupType) {
         // There is no existing setting for this plugin, so create one
@@ -136,8 +193,12 @@ export default class LazyPlugin extends Plugin {
   /**
    * Update an individual plugin's configuration in the settings file
    */
-  async updatePluginSettings (pluginId: string, startupType: LoadingMethod) {
-    this.settings.plugins[pluginId] = { startupType }
+  async updatePluginSettings(pluginId: string, startupType: LoadingMethod) {
+    this.settings.plugins[pluginId] = {
+      startupType: startupType,
+      // TODO: me - Not sure if this will overwrite any assignments made before hand
+      groupIds: Object.values(LoadingMethod)
+    }
     await this.saveSettings()
   }
 
