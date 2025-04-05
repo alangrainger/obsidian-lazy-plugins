@@ -12,7 +12,7 @@ export enum LoadingMethod {
 export interface PluginSettings {
   startupType?: LoadingMethod;
   loadAfter?: string;
-  groupId?: string[]
+  groupIds?: string[]
 }
 
 // TODO: me - Might be better to have id for plugin => group mapping
@@ -20,9 +20,9 @@ export interface PluginSettings {
 export interface PluginGroupSettings {
   enablePluginsDuringStartup: boolean;
   generateEnableDisableCommands: boolean;
-  startupDelaySeconds?: number;
+  startupDelaySeconds: number;
   autoAddNewPlugins: boolean;
-  plugins: {};
+  plugins: string[];
 }
 
 // Settings per device (desktop/mobile)
@@ -47,25 +47,25 @@ export function createDefaultGroups(device: DeviceSettings): PluginGroupSettings
     generateEnableDisableCommands: false,
     startupDelaySeconds: 0,
     autoAddNewPlugins: device.defaultStartupType == LoadingMethod.disabled,
-    plugins: {}
+    plugins: []
   },{
     enablePluginsDuringStartup: true,
     generateEnableDisableCommands: false,
     startupDelaySeconds: device.shortDelaySeconds,
     autoAddNewPlugins: device.defaultStartupType == LoadingMethod.short,
-    plugins: {}
+    plugins: []
   },{
     enablePluginsDuringStartup: true,
     generateEnableDisableCommands: false,
     startupDelaySeconds: device.longDelaySeconds,
     autoAddNewPlugins: device.defaultStartupType == LoadingMethod.long,
-    plugins: {}
+    plugins: []
   },{
     enablePluginsDuringStartup: false,
     generateEnableDisableCommands: false,
     startupDelaySeconds: 0,
     autoAddNewPlugins: device.defaultStartupType == LoadingMethod.disabled,
-    plugins: {}
+    plugins: []
   }];
 }
 
@@ -109,17 +109,15 @@ export class SettingsTab extends PluginSettingTab {
   filterString: string | undefined
   containerEl: HTMLElement
   pluginListContainer: HTMLElement
-  groupsListContainer: HTMLElement
+  // groupsListContainer: HTMLElement
   pluginSettings: { [pluginId: string]: PluginSettings } = {}
-  groupSettings: { [groupId: string]: PluginGroupSettings } = {}
+  // groupSettings: { [groupId: string]: PluginGroupSettings } = {}
 
   constructor (app: App, plugin: LazyPlugin) {
     super(app, plugin)
     this.app = app
     this.lazyPlugin = plugin
     this.pluginSettings = this.lazyPlugin.settings.plugins
-    // TODO: me - Unsure of how to map groups
-    this.groupSettings = this.lazyPlugin.settings.groups
   }
 
   async display () {
@@ -256,15 +254,16 @@ export class SettingsTab extends PluginSettingTab {
     this.buildPluginList()
 
     // Add an element to contain the groups list
-    // TODO: me - This should default to being hidden by a switch
-    this.groupsListContainer = this.containerEl.createEl('div')
-    this.buildGroupList()
+    // This should default to hidden via switch
+    // With the "4 group" defaulting to show via switch
+    // this.groupsListContainer = this.containerEl.createEl('div')
+    // this.buildGroupList()
   }
 
+  // Eventual building point for the UI controls necessary to support
+  // groups as a plugin loading mechanism
   buildGroupList() {
-    this.groupsListContainer.textContent = ''
-    // TODO: need to add list of "something" similar to `PluginManifest`
-    this.lazyPlugin.groups.forEach(group => {});
+    // this.groupsListContainer.textContent = ''
   }
 
   buildPluginList () {

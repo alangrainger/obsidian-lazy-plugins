@@ -5,8 +5,8 @@ import {
   DeviceSettings,
   LazySettings,
   LoadingMethod,
-  PluginGroupSettings,
   SettingsTab,
+  PluginGroupSettings,
   createDefaultGroups
 } from './settings'
 
@@ -18,34 +18,6 @@ export default class LazyPlugin extends Plugin {
   device = 'desktop/global'
   manifests: PluginManifest[]
   pendingTimeouts: NodeJS.Timeout[] = []
-
-  /* Plugin manager code
-    m = Manager.getInstance()
-    m.main = this;
-    await m.loadSettings();
-
-    this.manifests.forEach(/* add new plugins to "Auto-Add" group *\/)
-
-    // TODO: merge `PluginGroupSettings` into `SettingsTab`
-    Manager.getInstance().updateStatusbarItem();
-
-    m.groupsMap
-      .forEach(group => {
-        if (m.generateCommands) {
-          CommandManager.getInstance().AddEnableDisableCommands(group)
-        }
-        if (group.loadAtStartup) {
-          group.startup()
-        }
-      });
-  */
-
-  async loadGroupSettings() {
-    /*
-    loadData
-    select between mobile and desktop
-    */
-  }
 
   async onload() {
     await this.loadSettings()
@@ -71,7 +43,10 @@ export default class LazyPlugin extends Plugin {
   async setPluginStartup(pluginId: string) {
     const obsidian = this.app.plugins
 
-    const groups = this.getPluginsGroups(pluginId).map(groupId => this.settings?.groups[groupId]).filter(group => group.enablePluginsDuringStartup).sort(group => group.startupDelaySeconds)
+    const groups = this.getPluginsGroups(pluginId)
+      .map(groupId => this.settings?.groups[groupId])
+      .filter(group => group.enablePluginsDuringStartup)
+      .sort(group => group.startupDelaySeconds)
 
     // If there are no groups set to enable during startup, then we
     // disable the plugin and exit
@@ -80,22 +55,28 @@ export default class LazyPlugin extends Plugin {
       return
     }
 
-    // If the plugin is currently active and is not part of a group that
-    // is set to auto-load immediately on startup. Quick disable and then
-    // re-enable the plugin so the plugin doesn't load immediately on
-    // the next startup. In fact, we only care about the first group duing
-    // loading, even though we allow for a plugin to exist in multiple groups
+    // Otherwise, since we've sorted the list by the startup delay
+    // the earliest load binding will be the first in the final list
+    // If the delay is 0, we just immediately enable the plugin and return
     const loadGroup = groups[0]
+    if (loadGroup.startupDelaySeconds == 0) {
+      await obsidian.enablePluginAndSave(pluginId)
+      return
+    }
+
+    // If the delay isn't 0, we have to handle the case where the plugin
+    // was enabled through some other mechanism already (normally when
+    // a new plugin was just installed). If we detect this, we quick disable
+    // and re-enable the plugin so it doesn't load automatically on the next
+    // time. Otherwise, we just need to wait out the startup delay
     const isEnabled = obsidian.enabledPlugins.has(pluginId)
     const isRunning = obsidian.plugins?.[pluginId]?._loaded
     const currentlyActive = isEnabled && isRunning
-    if (loadGroup.startupDelaySeconds == 0) {
-      await obsidian.enablePluginAndSave(pluginId)
-    } else if (currentlyActive) {
+    if (currentlyActive) {
       await obsidian.disablePluginAndSave(pluginId)
       await obsidian.enablePlugin(pluginId)
-    } else if (!isRunning) {
 
+    } else if (!isRunning) {
       // Add a short additional delay to each plugin, for two purposes:
       // 1. Have them load in a consistent order, which helps them appear in the sidebar in the same order
       // 2. Stagger them slightly so there's not a big slowdown when they all fire at once
@@ -119,36 +100,32 @@ export default class LazyPlugin extends Plugin {
    * loading method (enabled/disabled) if no configuration is found for this plugin.
    */
   getPluginStartup(pluginId: string): LoadingMethod {
-    return this.settings.plugins?.[pluginId]?.startupType ||
-      this.settings.defaultStartupType ||
-      (this.app.plugins.enabledPlugins.has(pluginId) ? LoadingMethod.instant : LoadingMethod.disabled)
+    return this.settings.plugins?.[pluginId]?.startupType
+      || this.settings.defaultStartupType
+      || (this.app.plugins.enabledPlugins.has(pluginId)
+        ? LoadingMethod.instant : LoadingMethod.disabled)
   }
 
-  // TODO: me - Not sure how to map from group to group id
   getPluginsGroups(pluginId: string): string[] {
-    this.settings.plugins[pluginId].groupIds = Object.assign([], Object.values(LoadingMethod).filter(v => typeof v == "string"), this.settings.plugins[pluginId].groupIds);
-    return this.settings.plugins[pluginId].groupIds
+    this.settings.plugins[pluginId].groupIds = Object.assign([],
+      Object.values(LoadingMethod),
+      this.settings.plugins[pluginId].groupIds);
+    return this.settings.plugins?.[pluginId]?.groupIds ?? []
   }
 
-  // This should only be added for new groups
-  // TODO: me - This needs to not reference `startup_type` if possible
-  // Might need to wait for second cl
+  // List out all groups that this plugin should be auto-assigned to
+  // This is only called when initializing a plugin's loading settings
   getAutoAddGroups(pluginId: string): string[] {
-    this.settings.plugins?.[pluginId]
-    var groups = this.settings.groups.filter((id, group) => group.autoAddNewPlugins)
-      .map((id: string, group) => id)
-    if (!groups) {
-      return [this.settings.plugins?.[pluginId]?.startupType ||
-        this.settings.defaultStartupType ||
-        (this.app.plugins.enabledPlugins.has(pluginId) ? LoadingMethod.instant : LoadingMethod.disabled)]
-    }
-    return groups
+    // Since we don't have a method for creating custom groups, we can just
+    // keep this as assigning the current default option
+    return [LoadingMethod[this.getPluginStartup(pluginId)]]
   }
 
   async loadSettings() {
     this.data = Object.assign({}, DEFAULT_SETTINGS, await this.loadData())
     // Object.assign only works 1 level deep, so need to clone the sub-level as well
-    this.data.desktop = Object.assign({}, DEFAULT_DEVICE_SETTINGS, this.data.desktop)
+    this.data.desktop = Object.assign(
+      {}, DEFAULT_DEVICE_SETTINGS, this.data.desktop)
 
     // If user has dual mobile/desktop settings enabled
     if (this.data.dualConfigs && Platform.isMobile) {
@@ -165,11 +142,11 @@ export default class LazyPlugin extends Plugin {
       this.device = 'desktop/global'
     }
 
-    // TODO: me - Not sure how groups will be saveable
-    // This should load in the groups from data.json if already present
-    // If not, this creates the default groups based on startup
-    // TODO: me - This would need to also have an ability to switch the auto add target
-    this.settings.groups = Object.assign({}, createDefaultGroups(this.settings), this.settings.groups)
+    // Plugin groups are stored alongside the normal settings data
+    // If an existing configuration isn't found, we construct a default
+    // mapping based on the default startup times
+    this.settings.groups = Object.assign(
+      {}, createDefaultGroups(this.settings), this.settings.groups)
   }
 
   async saveSettings() {
@@ -185,7 +162,7 @@ export default class LazyPlugin extends Plugin {
     for (const plugin of this.manifests) {
       if (!this.settings.plugins?.[plugin.id]?.startupType) {
         // There is no existing setting for this plugin, so create one
-        await this.updatePluginSettings(plugin.id, this.getPluginStartup(plugin.id))
+        await this.updatePluginSettings(plugin.id)
       }
     }
   }
@@ -193,11 +170,11 @@ export default class LazyPlugin extends Plugin {
   /**
    * Update an individual plugin's configuration in the settings file
    */
-  async updatePluginSettings(pluginId: string, startupType: LoadingMethod) {
+  async updatePluginSettings(pluginId: string) {
+    const startupType = this.getPluginStartup(pluginId)
     this.settings.plugins[pluginId] = {
       startupType: startupType,
-      // TODO: me - Not sure if this will overwrite any assignments made before hand
-      groupIds: Object.values(LoadingMethod)
+      groupIds: [LoadingMethod[startupType]]
     }
     await this.saveSettings()
   }
