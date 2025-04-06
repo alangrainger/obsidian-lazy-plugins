@@ -57,8 +57,10 @@ export default class LazyPlugin extends Plugin {
     // the earliest load binding will be the first in the final list
     // If the delay is 0, we just immediately enable the plugin and return
     const loadGroup = groups[0]
+    const isActiveOnStartup = obsidian.enabledPlugins.has(pluginId)
+    const isRunning = obsidian.plugins?.[pluginId]?._loaded
     if (loadGroup.startupDelaySeconds == 0) {
-      await obsidian.enablePluginAndSave(pluginId)
+      if (!isActiveOnStartup && !isRunning) await obsidian.enablePluginAndSave(pluginId)
       return
     }
 
@@ -67,10 +69,7 @@ export default class LazyPlugin extends Plugin {
     // a new plugin was just installed). If we detect this, we quick disable
     // and re-enable the plugin so it doesn't load automatically on the next
     // time. Otherwise, we just need to wait out the startup delay
-    const isEnabled = obsidian.enabledPlugins.has(pluginId)
-    const isRunning = obsidian.plugins?.[pluginId]?._loaded
-    const currentlyActive = isEnabled && isRunning
-    if (currentlyActive) {
+    if (isActiveOnStartup) {
       await obsidian.disablePluginAndSave(pluginId)
       await obsidian.enablePlugin(pluginId)
 
