@@ -41,7 +41,7 @@ export interface DeviceSettings {
 }
 
 // Default groups have their values from the device settings
-export function createDefaultGroups(device: DeviceSettings): PluginGroupSettings[] {
+export function createDefaultPluginGroups(device: DeviceSettings): PluginGroupSettings[] {
   return [{
     enablePluginsDuringStartup: true,
     generateEnableDisableCommands: false,

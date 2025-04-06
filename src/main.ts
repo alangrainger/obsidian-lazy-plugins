@@ -6,8 +6,7 @@ import {
   LazySettings,
   LoadingMethod,
   SettingsTab,
-  PluginGroupSettings,
-  createDefaultGroups
+  createDefaultPluginGroups
 } from './settings'
 
 const lazyPluginId = require('../manifest.json').id
@@ -27,7 +26,6 @@ export default class LazyPlugin extends Plugin {
       .filter(plugin =>
         plugin.id !== lazyPluginId &&                  // Filter out the Lazy Loader plugin
         !(Platform.isMobile && plugin.isDesktopOnly))  // Filter out desktop-only plugins from mobile
-      // TODO: me - In a separate branch, enable mobile only plugins
       .sort((a, b) => a.name.localeCompare(b.name))
 
     await this.setInitialPluginsConfiguration()
@@ -146,7 +144,7 @@ export default class LazyPlugin extends Plugin {
     // If an existing configuration isn't found, we construct a default
     // mapping based on the default startup times
     this.settings.groups = Object.assign(
-      {}, createDefaultGroups(this.settings), this.settings.groups)
+      {}, createDefaultPluginGroups(this.settings), this.settings.groups)
   }
 
   async saveSettings() {
