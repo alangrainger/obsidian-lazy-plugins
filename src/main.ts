@@ -18,7 +18,7 @@ export default class LazyPlugin extends Plugin {
   manifests: PluginManifest[]
   pendingTimeouts: NodeJS.Timeout[] = []
 
-  async onload() {
+  async onload () {
     await this.loadSettings()
 
     // Get the list of installed plugins
@@ -38,7 +38,7 @@ export default class LazyPlugin extends Plugin {
   /**
    * Configure and load a plugin based on its startup settings.
    */
-  async setPluginStartup(pluginId: string) {
+  async setPluginStartup (pluginId: string) {
     const obsidian = this.app.plugins
 
     const groups = this.getPluginsGroups(pluginId)
@@ -97,14 +97,13 @@ export default class LazyPlugin extends Plugin {
    * Get the startup type for a given pluginId, falling back to Obsidian's current
    * loading method (enabled/disabled) if no configuration is found for this plugin.
    */
-  getPluginStartup(pluginId: string): LoadingMethod {
-    return this.settings.plugins?.[pluginId]?.startupType
-      || this.settings.defaultStartupType
-      || (this.app.plugins.enabledPlugins.has(pluginId)
-        ? LoadingMethod.instant : LoadingMethod.disabled)
+  getPluginStartup (pluginId: string): LoadingMethod {
+    return this.settings.plugins?.[pluginId]?.startupType ||
+      this.settings.defaultStartupType ||
+      (this.app.plugins.enabledPlugins.has(pluginId) ? LoadingMethod.instant : LoadingMethod.disabled)
   }
 
-  getPluginsGroups(pluginId: string): string[] {
+  getPluginsGroups (pluginId: string): string[] {
     this.settings.plugins[pluginId].groupIds = Object.assign([],
       Object.values(LoadingMethod),
       this.settings.plugins[pluginId].groupIds);
@@ -113,17 +112,16 @@ export default class LazyPlugin extends Plugin {
 
   // List out all groups that this plugin should be auto-assigned to
   // This is only called when initializing a plugin's loading settings
-  getAutoAddGroups(pluginId: string): string[] {
+  getAutoAddGroups (pluginId: string): string[] {
     // Since we don't have a method for creating custom groups, we can just
     // keep this as assigning the current default option
     return [LoadingMethod[this.getPluginStartup(pluginId)]]
   }
 
-  async loadSettings() {
+  async loadSettings () {
     this.data = Object.assign({}, DEFAULT_SETTINGS, await this.loadData())
     // Object.assign only works 1 level deep, so need to clone the sub-level as well
-    this.data.desktop = Object.assign(
-      {}, DEFAULT_DEVICE_SETTINGS, this.data.desktop)
+    this.data.desktop = Object.assign({}, DEFAULT_DEVICE_SETTINGS, this.data.desktop)
 
     // If user has dual mobile/desktop settings enabled
     if (this.data.dualConfigs && Platform.isMobile) {
@@ -147,7 +145,7 @@ export default class LazyPlugin extends Plugin {
       {}, createDefaultPluginGroups(this.settings), this.settings.groups)
   }
 
-  async saveSettings() {
+  async saveSettings () {
     await this.saveData(this.data)
   }
 
@@ -156,7 +154,7 @@ export default class LazyPlugin extends Plugin {
    * for any new plugin in the future, depending on what default value is chosen in the
    * Settings page.
    */
-  async setInitialPluginsConfiguration() {
+  async setInitialPluginsConfiguration () {
     for (const plugin of this.manifests) {
       if (!this.settings.plugins?.[plugin.id]?.startupType) {
         // There is no existing setting for this plugin, so create one
@@ -168,7 +166,7 @@ export default class LazyPlugin extends Plugin {
   /**
    * Update an individual plugin's configuration in the settings file
    */
-  async updatePluginSettings(pluginId: string) {
+  async updatePluginSettings (pluginId: string) {
     const startupType = this.getPluginStartup(pluginId)
     this.settings.plugins[pluginId] = {
       startupType: startupType,

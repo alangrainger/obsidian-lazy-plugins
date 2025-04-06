@@ -8,15 +8,17 @@ export enum LoadingMethod {
   long = 'long'
 }
 
-// Change to store a nullable groupId. If not set, value is taken from manifest?
 export interface PluginSettings {
   startupType?: LoadingMethod;
   loadAfter?: string;
   groupIds?: string[]
 }
 
-// TODO: me - Might be better to have id for plugin => group mapping
-// As that is more easily supportable for backwards compatability
+// Settings to apply for all plugins that belong to this group
+// Though the list of member plugins can be specified by listing their ids
+// in this group, for backwards compatibility with `LoadingMethod`, group
+// membership is also stored inside the plugin's settings (as the loader
+// loops through the individual plugins).
 export interface PluginGroupSettings {
   enablePluginsDuringStartup: boolean;
   generateEnableDisableCommands: boolean;
@@ -41,7 +43,7 @@ export interface DeviceSettings {
 }
 
 // Default groups have their values from the device settings
-export function createDefaultPluginGroups(device: DeviceSettings): PluginGroupSettings[] {
+export function createDefaultPluginGroups (device: DeviceSettings): PluginGroupSettings[] {
   return [{
     enablePluginsDuringStartup: true,
     generateEnableDisableCommands: false,
@@ -91,7 +93,7 @@ export interface LazySettings {
 export const DEFAULT_SETTINGS: LazySettings = {
   dualConfigs: false,
   showConsoleLog: false,
-  desktop: DEFAULT_DEVICE_SETTINGS,
+  desktop: DEFAULT_DEVICE_SETTINGS
 }
 
 const LoadingMethods: { [key in LoadingMethod]: string } = {
@@ -109,8 +111,13 @@ export class SettingsTab extends PluginSettingTab {
   filterString: string | undefined
   containerEl: HTMLElement
   pluginListContainer: HTMLElement
-  // groupsListContainer: HTMLElement
   pluginSettings: { [pluginId: string]: PluginSettings } = {}
+  // Stubs for integrating plugin groups into the ui (w/ `buildGroupList`)
+  // This container should hold a ui for creating and listing plugin groups,
+  // somewhat similar to the current ui for individual plugins. For
+  // compatibility, this ui element should default to being hidden via
+  // switch/checkbox, pre-initialized with `createDefaultPluginGroups`
+  // groupsListContainer: HTMLElement
   // groupSettings: { [groupId: string]: PluginGroupSettings } = {}
 
   constructor (app: App, plugin: LazyPlugin) {
@@ -252,17 +259,11 @@ export class SettingsTab extends PluginSettingTab {
     // Add an element to contain the plugin list
     this.pluginListContainer = this.containerEl.createEl('div')
     this.buildPluginList()
-
-    // Add an element to contain the groups list
-    // This should default to hidden via switch
-    // With the "4 group" defaulting to show via switch
-    // this.groupsListContainer = this.containerEl.createEl('div')
-    // this.buildGroupList()
   }
 
   // Eventual building point for the UI controls necessary to support
   // groups as a plugin loading mechanism
-  buildGroupList() {
+  buildGroupList () {
     // this.groupsListContainer.textContent = ''
   }
 
