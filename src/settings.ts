@@ -11,6 +11,20 @@ export enum LoadingMethod {
 export interface PluginSettings {
   startupType?: LoadingMethod;
   loadAfter?: string;
+  groupIds?: string[]
+}
+
+// Settings to apply for all plugins that belong to this group
+// Though the list of member plugins can be specified by listing their ids
+// in this group, for backwards compatibility with `LoadingMethod`, group
+// membership is also stored inside the plugin's settings (as the loader
+// loops through the individual plugins).
+export interface PluginGroupSettings {
+  enablePluginsDuringStartup: boolean;
+  generateEnableDisableCommands: boolean;
+  startupDelaySeconds: number;
+  autoAddNewPlugins: boolean;
+  plugins: string[];
 }
 
 // Settings per device (desktop/mobile)
@@ -25,6 +39,36 @@ export interface DeviceSettings {
   enableDependencies: boolean;
   plugins: { [pluginId: string]: PluginSettings };
   loadOrder: string[];
+  groups: { [groupId: string]: PluginGroupSettings };
+}
+
+// Default groups have their values from the device settings
+export function createDefaultPluginGroups (device: DeviceSettings): PluginGroupSettings[] {
+  return [{
+    enablePluginsDuringStartup: true,
+    generateEnableDisableCommands: false,
+    startupDelaySeconds: 0,
+    autoAddNewPlugins: device.defaultStartupType == LoadingMethod.disabled,
+    plugins: []
+  },{
+    enablePluginsDuringStartup: true,
+    generateEnableDisableCommands: false,
+    startupDelaySeconds: device.shortDelaySeconds,
+    autoAddNewPlugins: device.defaultStartupType == LoadingMethod.short,
+    plugins: []
+  },{
+    enablePluginsDuringStartup: true,
+    generateEnableDisableCommands: false,
+    startupDelaySeconds: device.longDelaySeconds,
+    autoAddNewPlugins: device.defaultStartupType == LoadingMethod.long,
+    plugins: []
+  },{
+    enablePluginsDuringStartup: false,
+    generateEnableDisableCommands: false,
+    startupDelaySeconds: 0,
+    autoAddNewPlugins: device.defaultStartupType == LoadingMethod.disabled,
+    plugins: []
+  }];
 }
 
 export const DEFAULT_DEVICE_SETTINGS: DeviceSettings = {
@@ -68,6 +112,13 @@ export class SettingsTab extends PluginSettingTab {
   containerEl: HTMLElement
   pluginListContainer: HTMLElement
   pluginSettings: { [pluginId: string]: PluginSettings } = {}
+  // Stubs for integrating plugin groups into the ui (w/ `buildGroupList`)
+  // This container should hold a ui for creating and listing plugin groups,
+  // somewhat similar to the current ui for individual plugins. For
+  // compatibility, this ui element should default to being hidden via
+  // switch/checkbox, pre-initialized with `createDefaultPluginGroups`
+  // groupsListContainer: HTMLElement
+  // groupSettings: { [groupId: string]: PluginGroupSettings } = {}
 
   constructor (app: App, plugin: LazyPlugin) {
     super(app, plugin)
@@ -208,6 +259,12 @@ export class SettingsTab extends PluginSettingTab {
     // Add an element to contain the plugin list
     this.pluginListContainer = this.containerEl.createEl('div')
     this.buildPluginList()
+  }
+
+  // Eventual building point for the UI controls necessary to support
+  // groups as a plugin loading mechanism
+  buildGroupList () {
+    // this.groupsListContainer.textContent = ''
   }
 
   buildPluginList () {
