@@ -1,6 +1,13 @@
 import { App, DropdownComponent, PluginSettingTab, Setting } from 'obsidian'
 import LazyPlugin from './main'
 
+export enum LoadingMethod {
+  disabled = 'disabled',
+  instant = 'instant',
+  short = 'short',
+  long = 'long'
+}
+
 export interface PluginSettings {
   startupType?: LoadingMethod;
   loadAfter?: string;
@@ -45,13 +52,6 @@ export const DEFAULT_SETTINGS: LazySettings = {
   desktop: DEFAULT_DEVICE_SETTINGS
 }
 
-export enum LoadingMethod {
-  disabled = 'disabled',
-  instant = 'instant',
-  short = 'short',
-  long = 'long'
-}
-
 const LoadingMethods: { [key in LoadingMethod]: string } = {
   disabled: '⛔ Disable plugin',
   instant: '⚡ Instant',
@@ -63,13 +63,17 @@ export class SettingsTab extends PluginSettingTab {
   app: App
   lazyPlugin: LazyPlugin
   dropdowns: DropdownComponent[] = []
-  filter: LoadingMethod | undefined
+  filterMethod: LoadingMethod | undefined
+  filterString: string | undefined
   containerEl: HTMLElement
+  pluginListContainer: HTMLElement
+  pluginSettings: { [pluginId: string]: PluginSettings } = {}
 
   constructor (app: App, plugin: LazyPlugin) {
     super(app, plugin)
     this.app = app
     this.lazyPlugin = plugin
+    this.pluginSettings = this.lazyPlugin.settings.plugins
   }
 
   async display () {
@@ -88,7 +92,6 @@ export class SettingsTab extends PluginSettingTab {
    * Build the Settings modal DOM elements
    */
   buildDom () {
-    const pluginSettings = this.lazyPlugin.settings.plugins
     this.containerEl.empty()
 
     new Setting(this.containerEl)
@@ -173,7 +176,7 @@ export class SettingsTab extends PluginSettingTab {
         dropdown.onChange(async (value: LoadingMethod) => {
           // Update all plugins and save the config, but don't reload the plugins (would slow the UI down)
           this.lazyPlugin.manifests.forEach(plugin => {
-            pluginSettings[plugin.id] = { startupType: value }
+            this.pluginSettings[plugin.id] = { startupType: value }
           })
           // Update all the dropdowns
           this.dropdowns.forEach(dropdown => dropdown.setValue(value))
@@ -187,21 +190,38 @@ export class SettingsTab extends PluginSettingTab {
       .setName('Plugins')
       .setHeading()
       .setDesc('Filter by: ')
+      // Add the buttons to filter by startup method
       .then(setting => {
         this.addFilterButton(setting.descEl, 'All')
         Object.keys(LoadingMethods)
           .forEach(key => this.addFilterButton(setting.descEl, LoadingMethods[key as LoadingMethod], key as LoadingMethod))
       })
+    new Setting(this.containerEl)
+      // Add a free-text filter
+      .addText(text => text
+        .setPlaceholder('Type to filter list')
+        .onChange(value => {
+          this.filterString = value
+          this.buildPluginList()
+        }))
 
+    // Add an element to contain the plugin list
+    this.pluginListContainer = this.containerEl.createEl('div')
+    this.buildPluginList()
+  }
+
+  buildPluginList () {
+    this.pluginListContainer.textContent = ''
     // Add the delay settings for each installed plugin
     this.lazyPlugin.manifests
       .forEach(plugin => {
         const currentValue = this.lazyPlugin.getPluginStartup(plugin.id)
 
         // Filter the list of plugins if there is a filter specified
-        if (this.filter && currentValue !== this.filter) return
+        if (this.filterMethod && currentValue !== this.filterMethod) return
+        if (this.filterString && !plugin.name.toLowerCase().includes(this.filterString.toLowerCase())) return
 
-        new Setting(this.containerEl)
+        new Setting(this.pluginListContainer)
           .setName(plugin.name)
           .addDropdown(dropdown => {
             this.dropdowns.push(dropdown)
@@ -224,11 +244,11 @@ export class SettingsTab extends PluginSettingTab {
               setting.addDropdown(dropdown => {
                 dropdown.addOption('', 'Load after:')
                 this.lazyPlugin.manifests
-                  .filter(x => x.id !== plugin.id && pluginSettings?.[x.id]?.startupType !== LoadingMethod.disabled)
+                  .filter(x => x.id !== plugin.id && this.pluginSettings?.[x.id]?.startupType !== LoadingMethod.disabled)
                   .forEach(x => dropdown.addOption(x.id, x.name))
 
                 dropdown
-                  .setValue(pluginSettings?.[plugin.id]?.loadAfter || '')
+                  .setValue(this.pluginSettings?.[plugin.id]?.loadAfter || '')
                   .onChange(async (value: string) => {
                     // Update the config file, and disable/enable the plugin if needed
                     await this.lazyPlugin.updatePluginSettings(plugin.id, { loadAfter: value })
@@ -257,8 +277,8 @@ export class SettingsTab extends PluginSettingTab {
     const link = el.createEl('button', { text })
     link.addClass('lazy-plugin-filter')
     link.onclick = () => {
-      this.filter = value
-      this.buildDom()
+      this.filterMethod = value
+      this.buildPluginList()
     }
   }
 
