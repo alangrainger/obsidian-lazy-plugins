@@ -19,13 +19,7 @@ export default class LazyPlugin extends Plugin {
 
   async onload () {
     await this.loadSettings()
-
-    // Get the list of installed plugins
-    this.manifests = Object.values(this.app.plugins.manifests)
-      .filter(plugin =>
-        plugin.id !== lazyPluginId &&                  // Filter out the Lazy Loader plugin
-        !(Platform.isMobile && plugin.isDesktopOnly))  // Filter out desktop-only plugins from mobile
-      .sort((a, b) => a.name.localeCompare(b.name))
+    this.updateManifests()
 
     await this.setInitialPluginsConfiguration()
     this.addSettingTab(new SettingsTab(this.app, this))
@@ -139,6 +133,17 @@ export default class LazyPlugin extends Plugin {
   async updatePluginSettings (pluginId: string, startupType: LoadingMethod) {
     this.settings.plugins[pluginId] = { startupType }
     await this.saveSettings()
+  }
+
+  updateManifests () {
+    // Get the list of installed plugins
+    this.manifests = Object.values(this.app.plugins.manifests)
+      .filter(plugin =>
+        // Filter out the Lazy Loader plugin
+        plugin.id !== lazyPluginId &&
+        // Filter out desktop-only plugins from mobile
+        !(Platform.isMobile && plugin.isDesktopOnly))
+      .sort((a, b) => a.name.localeCompare(b.name))
   }
 
   /*

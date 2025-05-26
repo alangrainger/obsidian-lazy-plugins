@@ -14,8 +14,6 @@ export interface PluginSettings {
 
 // Settings per device (desktop/mobile)
 export interface DeviceSettings {
-  [key: string]: any;
-
   shortDelaySeconds: number;
   longDelaySeconds: number;
   delayBetweenPlugins: number;
@@ -23,6 +21,8 @@ export interface DeviceSettings {
   showDescriptions: boolean;
   enableDependencies: boolean;
   plugins: { [pluginId: string]: PluginSettings };
+
+  [key: string]: any;
 }
 
 export const DEFAULT_DEVICE_SETTINGS: DeviceSettings = {
@@ -76,6 +76,9 @@ export class SettingsTab extends PluginSettingTab {
   async display () {
     const { containerEl } = this
     this.containerEl = containerEl
+
+    // Update the list of installed plugins
+    this.lazyPlugin.updateManifests()
 
     // Load the settings from disk when the settings modal is displayed.
     // This avoids the issue where someone has synced the settings from another device,
