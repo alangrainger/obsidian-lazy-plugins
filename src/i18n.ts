@@ -1,5 +1,3 @@
-import { moment } from 'obsidian'
-
 const en = {
   separateConfig: 'Separate desktop/mobile configuration',
   separateConfigDescription: 'Enable this if you want to have different settings depending whether you\'re using a desktop or mobile device. All of the settings below can be configured differently on desktop and mobile. You\'re currently using the {{device}} settings.',
@@ -52,10 +50,16 @@ const translations: Record<'en' | 'zh', Record<TranslationKey, string>> = { en, 
 
 function getObsidianLanguage (): string {
   // getLanguage() was added in Obsidian 1.8.7, while this plugin supports 1.6.0.
-  const obsidian = require('obsidian') as typeof import('obsidian') & {
-    getLanguage?: () => string
+  const obsidian = require('obsidian') as { getLanguage?: () => string }
+  const language = obsidian.getLanguage?.()
+  if (language) return language
+
+  // Obsidian stores its UI language here; Moment's locale is for dates only.
+  try {
+    return typeof localStorage === 'undefined' ? 'en' : localStorage.getItem('language') || 'en'
+  } catch {
+    return 'en'
   }
-  return obsidian.getLanguage?.() || moment.locale() || 'en'
 }
 
 function normalizeLocale (locale: string): 'en' | 'zh' {
