@@ -1,5 +1,6 @@
 import { App, DropdownComponent, PluginSettingTab, Setting } from 'obsidian'
 import LazyPlugin from './main'
+import { t, TranslationKey } from './i18n'
 
 export enum LoadingMethod {
   disabled = 'disabled',
@@ -49,11 +50,11 @@ export const DEFAULT_SETTINGS: LazySettings = {
   desktop: DEFAULT_DEVICE_SETTINGS
 }
 
-const LoadingMethods: { [key in LoadingMethod]: string } = {
-  disabled: '⛔ Disable plugin',
-  instant: '⚡ Instant',
-  short: '⌚ Short delay',
-  long: '💤 Long delay'
+const LoadingMethods: { [key in LoadingMethod]: TranslationKey } = {
+  disabled: 'disabled',
+  instant: 'instant',
+  short: 'short',
+  long: 'long'
 }
 
 export class SettingsTab extends PluginSettingTab {
@@ -95,9 +96,10 @@ export class SettingsTab extends PluginSettingTab {
     this.containerEl.empty()
 
     new Setting(this.containerEl)
-      .setName('Separate desktop/mobile configuration')
-      .setDesc('Enable this if you want to have different settings depending whether you\'re using a desktop or mobile device. ' +
-        `All of the settings below can be configured differently on desktop and mobile. You're currently using the ${this.lazyPlugin.device} settings.`)
+      .setName(t('separateConfig'))
+      .setDesc(t('separateConfigDescription', {
+        device: t(this.lazyPlugin.device === 'mobile' ? 'deviceMobile' : 'deviceDesktop')
+      }))
       .addToggle(toggle => {
         toggle
           .setValue(this.lazyPlugin.data.dualConfigs)
@@ -111,13 +113,13 @@ export class SettingsTab extends PluginSettingTab {
       })
 
     new Setting(this.containerEl)
-      .setName('Lazy Loader settings')
+      .setName(t('settingsTitle'))
       .setHeading()
 
     // Create the two timer settings fields
     Object.entries({
-      shortDelaySeconds: 'Short delay (seconds)',
-      longDelaySeconds: 'Long delay (seconds)'
+      shortDelaySeconds: t('shortDelay'),
+      longDelaySeconds: t('longDelay')
     })
       .forEach(([key, name]) => {
         new Setting(this.containerEl)
@@ -131,9 +133,9 @@ export class SettingsTab extends PluginSettingTab {
       })
 
     new Setting(this.containerEl)
-      .setName('Default startup type for new plugins')
+      .setName(t('defaultStartupType'))
       .addDropdown(dropdown => {
-        dropdown.addOption('', 'Nothing configured')
+        dropdown.addOption('', t('nothingConfigured'))
         this.addDelayOptions(dropdown)
         dropdown
           .setValue(this.lazyPlugin.settings.defaultStartupType || '')
@@ -144,7 +146,7 @@ export class SettingsTab extends PluginSettingTab {
       })
 
     new Setting(this.containerEl)
-      .setName('Show plugin descriptions')
+      .setName(t('showDescriptions'))
       .addToggle(toggle => {
         toggle
           .setValue(this.lazyPlugin.settings.showDescriptions)
@@ -156,9 +158,9 @@ export class SettingsTab extends PluginSettingTab {
       })
 
     new Setting(this.containerEl)
-      .setName('Set the delay for all plugins at once')
+      .setName(t('setAllDelays'))
       .addDropdown(dropdown => {
-        dropdown.addOption('', 'Set all plugins to be:')
+        dropdown.addOption('', t('setAllPluginsTo'))
         this.addDelayOptions(dropdown)
         dropdown.onChange(async (value) => {
           const startupType = value as LoadingMethod
@@ -175,19 +177,19 @@ export class SettingsTab extends PluginSettingTab {
 
     // Add the filter buttons
     new Setting(this.containerEl)
-      .setName('Plugins')
+      .setName(t('plugins'))
       .setHeading()
-      .setDesc('Filter by: ')
+      .setDesc(t('filterBy'))
       // Add the buttons to filter by startup method
       .then(setting => {
-        this.addFilterButton(setting.descEl, 'All')
+        this.addFilterButton(setting.descEl, t('all'))
         Object.keys(LoadingMethods)
-          .forEach(key => this.addFilterButton(setting.descEl, LoadingMethods[key as LoadingMethod], key as LoadingMethod))
+          .forEach(key => this.addFilterButton(setting.descEl, t(LoadingMethods[key as LoadingMethod]), key as LoadingMethod))
       })
     new Setting(this.containerEl)
       // Add a free-text filter
       .addText(text => text
-        .setPlaceholder('Type to filter list')
+        .setPlaceholder(t('filterPlaceholder'))
         .onChange(value => {
           this.filterString = value
           this.buildPluginList()
@@ -237,7 +239,7 @@ export class SettingsTab extends PluginSettingTab {
   addDelayOptions (el: DropdownComponent) {
     Object.keys(LoadingMethods)
       .forEach(key => {
-        el.addOption(key, LoadingMethods[key as LoadingMethod])
+        el.addOption(key, t(LoadingMethods[key as LoadingMethod]))
       })
   }
 
